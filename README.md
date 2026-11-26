@@ -14,7 +14,7 @@ A private, mobile-first AI video studio for one family workspace with separate m
 - Node.js + FFmpeg worker that claims jobs, requests short MP4 clips, normalizes them and stitches a final MP4 with optional AI narration and uploaded background music.
 - Signed browser download links for completed videos.
 
-A successful frontend build does not mean the cloud services are already configured. Apply both SQL migrations and deploy the worker before generation can run.
+A successful frontend build does not mean the cloud services are already configured. Apply all four SQL migrations and deploy the worker before generation can run.
 
 ## 1. Supabase setup
 
