@@ -11,7 +11,7 @@ A private, mobile-first AI video studio for one family workspace with separate m
 - Storyboard, media asset and video job database structures.
 - Private Supabase Storage bucket for project media and rendered MP4 files.
 - Per-member FreeLLMAPI connection setup. Provider keys are encrypted by the trusted worker and are not exposed to the browser or other family members.
-- Node.js + FFmpeg worker that claims jobs, requests short MP4 clips, normalizes them and stitches a final MP4.
+- Node.js + FFmpeg worker that claims jobs, requests short MP4 clips, normalizes them and stitches a final MP4 with optional AI narration and uploaded background music.
 - Signed browser download links for completed videos.
 
 A successful frontend build does not mean the cloud services are already configured. Apply both SQL migrations and deploy the worker before generation can run.
@@ -34,8 +34,9 @@ Run these files in order in Supabase **SQL Editor**:
 1. `supabase/migrations/202611270001_initial_family_schema.sql`
 2. `supabase/migrations/202611270002_video_pipeline_and_family_invites.sql`
 3. `supabase/migrations/202611270003_video_job_recovery.sql`
+4. `supabase/migrations/202611270004_audio_production.sql`
 
-They create the family workspace, RLS policies, invitation functions, project scenes/assets, job queue, encrypted provider-connection table, atomic worker claim function, private Storage bucket, and automatic recovery leases for interrupted video jobs.
+They create the family workspace, RLS policies, invitation functions, project scenes/assets, job queue, encrypted provider-connection table, atomic worker claim function, private Storage bucket, automatic recovery leases for interrupted video jobs, and optional narration / background music settings.
 
 ## 2. Deploy the frontend PWA
 
