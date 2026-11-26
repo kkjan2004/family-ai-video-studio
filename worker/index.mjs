@@ -4,6 +4,8 @@ import { mkdtemp, writeFile, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawn } from 'node:child_process'
+import { lookup } from 'node:dns/promises'
+import { isIP } from 'node:net'
 import { createClient } from '@supabase/supabase-js'
 
 const required = ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'PROVIDER_CREDENTIALS_ENCRYPTION_KEY']
@@ -28,6 +30,30 @@ function decrypt(value) {
   const decipher = createDecipheriv('aes-256-gcm', encryptionKey, Buffer.from(iv, 'base64'))
   decipher.setAuthTag(Buffer.from(tag, 'base64'))
   return Buffer.concat([decipher.update(Buffer.from(body, 'base64')), decipher.final()]).toString('utf8')
+}
+function isPrivateAddress(address) {
+  if (isIP(address) === 4) {
+    const octets = address.split('.').map(Number)
+    const [a,b] = octets
+    return a === 0 || a === 10 || a === 127 || a >= 224
+      || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31)
+      || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127)
+      || (a === 198 && (b === 18 || b === 19))
+  }
+  const value = address.toLowerCase()
+  return value === '::' || value === '::1' || value.startsWith('fc') || value.startsWith('fd')
+    || value.startsWith('fe80:') || value.startsWith('ff')
+}
+async function validatePublicGateway(url) {
+  if (url.protocol !== 'https:') throw new Error('Use a public HTTPS FreeLLMAPI address.')
+  const hostname = url.hostname.toLowerCase()
+  if (hostname === 'localhost' || hostname.endsWith('.local') || isIP(hostname)) {
+    throw new Error('The gateway must use a public DNS hostname, not a local or IP address.')
+  }
+  const addresses = await lookup(hostname, { all: true, verbatim: true })
+  if (!addresses.length || addresses.some(item => isPrivateAddress(item.address))) {
+    throw new Error('The gateway hostname must resolve only to public IP addresses.')
+  }
 }
 function send(res, status, body) {
   res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
@@ -66,7 +92,7 @@ const server = http.createServer(async (req, res) => {
       const user = await authenticate(req)
       const body = await readJson(req)
       const base = new URL(String(body.baseUrl || ''))
-      if (base.protocol !== 'https:') throw new Error('Use a public HTTPS FreeLLMAPI address.')
+      await validatePublicGateway(base)
       if (!String(body.apiKey || '').trim() || String(body.apiKey).length > 4096) throw new Error('Enter a valid API key.')
       const baseUrl = base.toString().replace(/\/$/, '')
       if (!baseUrl.endsWith('/v1')) throw new Error('Base URL must end with /v1 (example: https://your-host/v1).')
