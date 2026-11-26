@@ -11,7 +11,7 @@ type Section = 'Home' | 'Create video' | 'My projects' | 'Family space' | 'Setti
 type Family = { id: string; name: string; created_at: string }
 type FamilyMember = { user_id: string; role: string; joined_at: string }
 type Project = { id: string; family_id: string; title: string; description: string | null; status: string; visibility: string; created_at: string }
-type VideoJob = { id: string; project_id: string; mode: string; status: string; progress: number; prompt: string; quality_target: string; target_duration_seconds: number; created_at: string; error_message: string | null }
+type VideoJob = { id: string; project_id: string; mode: string; status: string; progress: number; prompt: string; quality_target: string; target_duration_seconds: number; created_at: string; error_message: string | null; output_asset_id: string | null }
 
 const navigation: { label: Section; icon: typeof Home }[] = [
   { label: 'Home', icon: Home },
@@ -51,6 +51,9 @@ function App() {
   const [quality, setQuality] = useState('1080p')
   const [duration, setDuration] = useState('600')
   const [imageFile, setImageFile] = useState<File | null>(null)
+  const [gatewayUrl, setGatewayUrl] = useState('')
+  const [gatewayKey, setGatewayKey] = useState('')
+  const [providerSaving, setProviderSaving] = useState(false)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
@@ -92,7 +95,7 @@ function App() {
       setProjects(loadedProjects)
       if (loadedProjects.length) {
         const { data: jobRows, error: jobsError } = await supabase.from('video_jobs')
-          .select('id,project_id,mode,status,progress,prompt,quality_target,target_duration_seconds,created_at,error_message')
+          .select('id,project_id,mode,status,progress,prompt,quality_target,target_duration_seconds,created_at,error_message,output_asset_id')
           .in('project_id', loadedProjects.map(project => project.id))
           .order('created_at', { ascending: false })
         if (jobsError) throw jobsError
@@ -223,6 +226,35 @@ function App() {
     } finally { setBusy(false) }
   }
 
+  async function saveProviderConnection() {
+    const workerUrl = import.meta.env.VITE_WORKER_API_URL?.trim().replace(/\/$/, '')
+    if (!supabase || !workerUrl || !gatewayUrl.trim() || !gatewayKey.trim()) { setError('Worker URL, FreeLLMAPI base URL and your personal API key are required.'); return }
+    setProviderSaving(true); setError(''); setNotice('')
+    try {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+      if (sessionError) throw sessionError
+      const accessToken = sessionData.session?.access_token
+      if (!accessToken) throw new Error('Please sign in again.')
+      const response = await fetch(workerUrl + '/api/provider-connection', { method: 'POST', headers: { authorization: 'Bearer ' + accessToken, 'content-type': 'application/json' }, body: JSON.stringify({ baseUrl: gatewayUrl.trim(), apiKey: gatewayKey.trim(), model: 'auto' }) })
+      const payload = await response.json() as { ok?: boolean; message?: string; error?: string }
+      if (!response.ok) throw new Error(payload.error || 'Provider connection could not be saved.')
+      setGatewayKey(''); setNotice(payload.message || 'Your personal provider connection was saved securely.')
+    } catch (err) { setError(err instanceof Error ? err.message : 'Provider connection could not be saved.') }
+    finally { setProviderSaving(false) }
+  }
+
+  async function downloadJob(job: VideoJob) {
+    if (!supabase || !job.output_asset_id) return
+    setError('')
+    try {
+      const { data: asset, error: assetError } = await supabase.from('project_assets').select('storage_path,file_name').eq('id', job.output_asset_id).single()
+      if (assetError) throw assetError
+      const { data: signed, error: signedError } = await supabase.storage.from('family-projects').createSignedUrl(asset.storage_path, 300, { download: asset.file_name })
+      if (signedError) throw signedError
+      window.location.assign(signed.signedUrl)
+    } catch (err) { setError(err instanceof Error ? err.message : 'Video download link could not be created.') }
+  }
+
   async function deleteProject(projectId: string) {
     if (!supabase || !window.confirm('Delete this project and its scenes, assets and jobs?')) return
     setBusy(true); setError('')
@@ -313,7 +345,7 @@ function App() {
           <div className="project-list">{projects.length ? projects.map(project => {
             const projectJobs = jobs.filter(job => job.project_id === project.id)
             const latestJob = projectJobs[0]
-            return <article className="project-card" key={project.id}><div className="project-icon"><Film size={22} /></div><div className="project-main"><strong>{project.title}</strong><span>{project.visibility === 'family' ? 'Family shared' : 'Private'} · {prettyDate(project.created_at)}</span>{latestJob && <div className="job-line"><span className={`job-status status-${latestJob.status}`}>{statusLabel(latestJob.status)}</span><span>{latestJob.progress}% · {latestJob.quality_target} · {Math.round(latestJob.target_duration_seconds / 60)} min</span></div>}{latestJob?.error_message && <small className="job-error">{latestJob.error_message}</small>}</div><button className="icon-button delete-project" onClick={() => void deleteProject(project.id)} aria-label="Delete project"><X size={17} /></button></article>
+            return <article className="project-card" key={project.id}><div className="project-icon"><Film size={22} /></div><div className="project-main"><strong>{project.title}</strong><span>{project.visibility === 'family' ? 'Family shared' : 'Private'} · {prettyDate(project.created_at)}</span>{latestJob && <div className="job-line"><span className={`job-status status-${latestJob.status}`}>{statusLabel(latestJob.status)}</span><span>{latestJob.progress}% · {latestJob.quality_target} · {Math.round(latestJob.target_duration_seconds / 60)} min</span></div>}{latestJob?.error_message && <small className="job-error">{latestJob.error_message}</small>}{latestJob?.status === 'completed' && <button className="text-button download-button" onClick={() => void downloadJob(latestJob)}><Film size={14} /> Download MP4</button>}</div><button className="icon-button delete-project" onClick={() => void deleteProject(project.id)} aria-label="Delete project"><X size={17} /></button></article>
           }) : <div className="panel empty-large"><div className="empty-icon"><Film size={28} /></div><h2>No projects yet</h2><p>Start a video and your saved projects will appear here.</p><button className="primary-button" onClick={() => openCreator()}><Plus size={17} /> Create your first video</button></div>}</div>
         </div>}
 
@@ -325,7 +357,7 @@ function App() {
           </>}
         </div>}
 
-        {!loading && section === 'Settings' && <div className="page-content inner-page"><div className="eyebrow"><Settings2 size={14} /> WORKSPACE SETTINGS</div><h1>Studio <em>settings.</em></h1><p className="page-lead">Privacy, account and generation preferences.</p><div className="panel settings-list"><div><span>Signed-in account</span><strong>{userEmail}</strong></div><div><span>Workspace</span><strong>{family?.name ?? 'Not created yet'}</strong></div><div><span>Workspace visibility</span><strong><ShieldCheck size={16} /> Private family workspace</strong></div><div><span>Default video length</span><strong>10 minutes</strong></div><div><span>Target output</span><strong>1080p where supported</strong></div><div><span>Rendering worker</span><strong className="pending"><Clock3 size={16} /> Awaiting server setup</strong></div><div><span>Service connection</span><strong>Supabase Auth & Database</strong></div></div><button className="secondary-button" onClick={() => void loadWorkspace()}><RefreshCw size={16} /> Refresh workspace data</button></div>}
+        {!loading && section === 'Settings' && <div className="page-content inner-page"><div className="eyebrow"><Settings2 size={14} /> WORKSPACE SETTINGS</div><h1>Studio <em>settings.</em></h1><p className="page-lead">Privacy, account and generation preferences.</p><div className="panel settings-list"><div><span>Signed-in account</span><strong>{userEmail}</strong></div><div><span>Workspace</span><strong>{family?.name ?? 'Not created yet'}</strong></div><div><span>Workspace visibility</span><strong><ShieldCheck size={16} /> Private family workspace</strong></div><div><span>Default video length</span><strong>10 minutes</strong></div><div><span>Target output</span><strong>1080p where supported</strong></div><div><span>Rendering worker</span><strong className="pending"><Clock3 size={16} /> Awaiting server setup</strong></div><div><span>Service connection</span><strong>Supabase Auth & Database</strong></div></div><div className="panel provider-panel"><div className="section-heading"><div><span className="eyebrow">AI PROVIDER</span><h2>Connect your own FreeLLMAPI</h2></div><Sparkles size={20} /></div>{import.meta.env.VITE_WORKER_API_URL ? <><label className="field-label" htmlFor="gateway-url">YOUR PUBLIC HTTPS GATEWAY URL (ENDS IN /v1)</label><input id="gateway-url" value={gatewayUrl} onChange={event => setGatewayUrl(event.target.value)} placeholder="https://your-freellmapi-host/v1" /><label className="field-label" htmlFor="gateway-key">YOUR PERSONAL FREE LLM API KEY</label><input id="gateway-key" type="password" autoComplete="off" value={gatewayKey} onChange={event => setGatewayKey(event.target.value)} placeholder="Paste your own gateway key" /><button className="primary-button" disabled={providerSaving || !gatewayUrl.trim() || !gatewayKey.trim()} onClick={() => void saveProviderConnection()}>{providerSaving ? 'Encrypting & saving…' : 'Save my secure provider connection'} <ChevronRight size={16} /></button><p className="helper-text">Each family member connects their own permitted account. Keys are sent only to your HTTPS worker and encrypted before storage; they are never placed in the browser database or shared with other members.</p></> : <p className="helper-text">The secure rendering worker URL is not configured yet. Deploy the worker in the /worker folder, then set VITE_WORKER_API_URL in the frontend build environment.</p>}</div><button className="secondary-button" onClick={() => void loadWorkspace()}><RefreshCw size={16} /> Refresh workspace data</button></div>
       </main>
     </div>
   )
