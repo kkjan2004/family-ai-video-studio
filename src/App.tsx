@@ -114,13 +114,14 @@ function App() {
 
   useEffect(() => {
     const token = new URLSearchParams(window.location.search).get('invite')
-    if (!token || !supabase) return
+    const client = supabase
+    if (!token || !client) return
     let cancelled = false
     const accept = async () => {
       try {
         const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token))
         const tokenHash = Array.from(new Uint8Array(digest)).map(byte => byte.toString(16).padStart(2, '0')).join('')
-        const { error: acceptError } = await supabase.rpc('accept_family_invitation', { invite_token_hash: tokenHash })
+        const { error: acceptError } = await client.rpc('accept_family_invitation', { invite_token_hash: tokenHash })
         if (acceptError) throw acceptError
         if (!cancelled) {
           window.history.replaceState({}, '', window.location.pathname)
