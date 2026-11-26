@@ -97,6 +97,8 @@ const server = http.createServer(async (req, res) => {
       if (!String(body.apiKey || '').trim() || String(body.apiKey).length > 4096) throw new Error('Enter a valid API key.')
       const baseUrl = base.toString().replace(/\/$/, '')
       if (!baseUrl.endsWith('/v1')) throw new Error('Base URL must end with /v1 (example: https://your-host/v1).')
+      const verification = await fetch(baseUrl + '/models?available=true', { headers: { authorization: 'Bearer ' + String(body.apiKey).trim() }, signal: AbortSignal.timeout(20000) })
+      if (!verification.ok) throw new Error('FreeLLMAPI connection check failed with HTTP ' + verification.status + '.')
       const { error } = await supabase.from('provider_connections').upsert({
         user_id: user.id,
         provider: 'freellmapi',
