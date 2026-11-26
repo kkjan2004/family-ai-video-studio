@@ -180,7 +180,14 @@ async function generateSpeech({ baseUrl, apiKey, text, voice }) {
   const response = await fetch(baseUrl + '/audio/speech', {
     method: 'POST',
     headers: { authorization: 'Bearer ' + apiKey, 'content-type': 'application/json' },
-    body: JSON.stringify({\n      model: process.env.TTS_MODEL || 'auto',\n      input: text,\n      voice: voice || 'alloy',\n      response_format: 'mp3',\n      speed: 0.96,\n      instructions: 'Speak like a real, warm, emotionally present human narrator, never like a robotic AI voice. Use natural conversational rhythm, varied intonation, gentle emphasis on meaningful words, realistic pauses at commas and sentence endings, and smooth connected phrasing. Sound relaxed, sincere and engaging, as if telling this story directly to one person. Avoid a flat, overly polished announcer tone, exaggerated drama, artificial cheerfulness, and mechanically equal pacing. Pronounce every word clearly and naturally in the language of the supplied text. Do not read punctuation or stage directions aloud.'\n    }),
+    body: JSON.stringify({
+      model: process.env.TTS_MODEL || 'auto',
+      input: text,
+      voice: voice || 'alloy',
+      response_format: 'mp3',
+      speed: 0.96,
+      instructions: 'Speak like a real, warm, emotionally present human narrator, never like a robotic AI voice. Use natural conversational rhythm, varied intonation, gentle emphasis on meaningful words, realistic pauses at commas and sentence endings, and smooth connected phrasing. Sound relaxed, sincere and engaging, as if telling this story directly to one person. Avoid a flat, overly polished announcer tone, exaggerated drama, artificial cheerfulness, and mechanically equal pacing. Pronounce every word clearly and naturally in the language of the supplied text. Do not read punctuation or stage directions aloud.'
+    }),
     signal: AbortSignal.timeout(120000)
   })
   if (!response.ok) {
