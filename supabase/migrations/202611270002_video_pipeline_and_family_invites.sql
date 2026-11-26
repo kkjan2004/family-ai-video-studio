@@ -230,6 +230,19 @@ drop trigger if exists scenes_set_updated_at on public.project_scenes;
 create trigger scenes_set_updated_at before update on public.project_scenes
 for each row execute function public.set_updated_at();
 
+-- Verify that a storage path's family and project IDs match the same database row.
+create or replace function public.can_access_family_project_path(target_family_id uuid, target_project_id uuid)
+returns boolean language sql stable security definer set search_path = ''
+as $
+  select exists (
+    select 1 from public.projects p
+    where p.id = target_project_id and p.family_id = target_family_id
+      and public.can_access_project(p.id)
+  );
+$;
+revoke all on function public.can_access_family_project_path(uuid,uuid) from public;
+grant execute on function public.can_access_family_project_path(uuid,uuid) to authenticated;
+
 -- Private object bucket. Paths must start with family_id/project_id.
 insert into storage.buckets(id,name,public,file_size_limit,allowed_mime_types)
 values ('family-projects','family-projects',false,524288000,
@@ -241,7 +254,7 @@ create policy "family_storage_read_project_members" on storage.objects
 for select to authenticated using (
   bucket_id = 'family-projects'
   and (storage.foldername(name))[1] is not null
-  and public.can_access_project(((storage.foldername(name))[2])::uuid)
+  and public.can_access_family_project_path(((storage.foldername(name))[1])::uuid, ((storage.foldername(name))[2])::uuid)
 );
 drop policy if exists "family_storage_upload_project_members" on storage.objects;
 create policy "family_storage_upload_project_members" on storage.objects
