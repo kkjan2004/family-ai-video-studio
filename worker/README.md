@@ -23,6 +23,7 @@ Every family member must connect their own permitted FreeLLMAPI account / gatewa
 - Assembles longer projects from those clips; provider support, quota and speed determine completion time.
 - The final clips are normalized to 1080-sized frames and 30 fps. This is an output target, not a promise of native 1080p source quality.
 - Audio mixing, narration tracks, and advanced scene editing remain future enhancements. Recovery restarts an interrupted job from the beginning; it does not resume individual clips.
+- If the worker stops unexpectedly, the job is reclaimed after its 10-minute lease expires and restarted from the beginning. A job gets at most three worker claims.
 - Provider calls can take up to five minutes per clip. Monitor provider limits before queueing long videos.
 
 ## Security
