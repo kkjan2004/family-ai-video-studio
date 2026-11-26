@@ -342,7 +342,7 @@ async function processJob(job) {
     let finalPath = silentPath
     if (narrationSegments.length) {
       const narrationList = join(workDir, 'narration.txt')
-      await writeFile(narrationList, narrationSegments.map(path => `file '${path.replace(/'/g, "'\\\\''")}'`).join('\\n'))
+      await writeFile(narrationList, narrationSegments.map(path => `file '${path.replace(/'/g, "'\\\\''")}'`).join('\n'))
       const narrationPath = join(workDir, 'narration.wav')
       await run('ffmpeg', ['-y','-f','concat','-safe','0','-i',narrationList,'-ar','44100','-ac','2','-c:a','pcm_s16le',narrationPath])
       const args = ['-y','-i',silentPath,'-i',narrationPath]
