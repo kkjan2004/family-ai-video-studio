@@ -3,7 +3,8 @@
 This is a private server-side worker. It is not part of the browser bundle.
 
 ## What it does
-- Authenticates provider-credential setup requests with the user's Supabase access token.
+- Authenticates provider-credential setup and status requests with the user's Supabase access token.
+- Reports only whether the signed-in member has a configured provider; never returns the encrypted key.
 - Encrypts each member's own FreeLLMAPI key using AES-256-GCM before storing it.
 - Claims queued jobs atomically from Supabase.
 - Calls the FreeLLMAPI video endpoint for short clips, normalizes them with FFmpeg, stitches them, and stores the MP4 in the private Supabase Storage bucket.
