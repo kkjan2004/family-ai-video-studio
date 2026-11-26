@@ -54,6 +54,7 @@ function App() {
   const [gatewayUrl, setGatewayUrl] = useState('')
   const [gatewayKey, setGatewayKey] = useState('')
   const [providerSaving, setProviderSaving] = useState(false)
+  const [providerStatus, setProviderStatus] = useState<'checking' | 'connected' | 'not_connected' | 'unavailable'>('checking')
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
@@ -116,7 +117,8 @@ function App() {
     const client = supabase
     const active = jobs.some(job => ['queued','planning','generating','rendering'].includes(job.status))
     if (!client || !active || !projects.length) return
-    const projectIds = projects.map(project => project.id)
+    const projectIdsKey = projects.map(project => project.id).join(',')
+    const projectIds = projectIdsKey.split(',').filter(Boolean)
     const timer = window.setInterval(async () => {
       const [jobResult, projectResult] = await Promise.all([
         client.from('video_jobs').select('id,project_id,mode,status,progress,prompt,quality_target,target_duration_seconds,created_at,error_message,output_asset_id').in('project_id', projectIds).order('created_at', { ascending: false }),
@@ -126,7 +128,7 @@ function App() {
       if (!projectResult.error && projectResult.data) setProjects(projectResult.data as Project[])
     }, 10000)
     return () => window.clearInterval(timer)
-  }, [jobs, projects, family?.id])
+  }, [jobs.some(job => ['queued','planning','generating','rendering'].includes(job.status)), projects.map(project => project.id).join(','), family?.id])
 
   useEffect(() => {
     const token = new URLSearchParams(window.location.search).get('invite')
@@ -243,6 +245,23 @@ function App() {
     } finally { setBusy(false) }
   }
 
+  async function refreshProviderStatus() {
+    const workerUrl = import.meta.env.VITE_WORKER_API_URL?.trim().replace(/\\/$/, '')
+    if (!supabase || !workerUrl) { setProviderStatus('unavailable'); return }
+    try {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+      if (sessionError) throw sessionError
+      const accessToken = sessionData.session?.access_token
+      if (!accessToken) throw new Error('Sign in required')
+      const response = await fetch(workerUrl + '/api/provider-connection', { headers: { authorization: 'Bearer ' + accessToken } })
+      if (!response.ok) throw new Error('Provider status unavailable')
+      const payload = await response.json() as { configured?: boolean }
+      setProviderStatus(payload.configured ? 'connected' : 'not_connected')
+    } catch {
+      setProviderStatus('unavailable')
+    }
+  }
+
   async function saveProviderConnection() {
     const workerUrl = import.meta.env.VITE_WORKER_API_URL?.trim().replace(/\/$/, '')
     if (!supabase || !workerUrl || !gatewayUrl.trim() || !gatewayKey.trim()) { setError('Worker URL, FreeLLMAPI base URL and your personal API key are required.'); return }
@@ -255,7 +274,7 @@ function App() {
       const response = await fetch(workerUrl + '/api/provider-connection', { method: 'POST', headers: { authorization: 'Bearer ' + accessToken, 'content-type': 'application/json' }, body: JSON.stringify({ baseUrl: gatewayUrl.trim(), apiKey: gatewayKey.trim(), model: 'auto' }) })
       const payload = await response.json() as { ok?: boolean; message?: string; error?: string }
       if (!response.ok) throw new Error(payload.error || 'Provider connection could not be saved.')
-      setGatewayKey(''); setNotice(payload.message || 'Your personal provider connection was saved securely.')
+      setGatewayKey(''); setProviderStatus('connected'); setNotice(payload.message || 'Your personal provider connection was saved securely.')
     } catch (err) { setError(err instanceof Error ? err.message : 'Provider connection could not be saved.') }
     finally { setProviderSaving(false) }
   }
@@ -283,6 +302,10 @@ function App() {
     } catch (err) { setError(err instanceof Error ? err.message : 'Project could not be deleted.') }
     finally { setBusy(false) }
   }
+
+  useEffect(() => {
+    if (section === 'Settings') void refreshProviderStatus()
+  }, [section])
 
   const statusLabel = (status: string) => status.replaceAll('_', ' ').replace(/^./, char => char.toUpperCase())
 
@@ -374,7 +397,7 @@ function App() {
           </>}
         </div>}
 
-        {!loading && section === 'Settings' && <div className="page-content inner-page"><div className="eyebrow"><Settings2 size={14} /> WORKSPACE SETTINGS</div><h1>Studio <em>settings.</em></h1><p className="page-lead">Privacy, account and generation preferences.</p><div className="panel settings-list"><div><span>Signed-in account</span><strong>{userEmail}</strong></div><div><span>Workspace</span><strong>{family?.name ?? 'Not created yet'}</strong></div><div><span>Workspace visibility</span><strong><ShieldCheck size={16} /> Private family workspace</strong></div><div><span>Default video length</span><strong>10 minutes</strong></div><div><span>Target output</span><strong>1080p where supported</strong></div><div><span>Rendering worker</span><strong className="pending"><Clock3 size={16} /> Awaiting server setup</strong></div><div><span>Service connection</span><strong>Supabase Auth & Database</strong></div></div><div className="panel provider-panel"><div className="section-heading"><div><span className="eyebrow">AI PROVIDER</span><h2>Connect your own FreeLLMAPI</h2></div><Sparkles size={20} /></div>{import.meta.env.VITE_WORKER_API_URL ? <><label className="field-label" htmlFor="gateway-url">YOUR PUBLIC HTTPS GATEWAY URL (ENDS IN /v1)</label><input id="gateway-url" value={gatewayUrl} onChange={event => setGatewayUrl(event.target.value)} placeholder="https://your-freellmapi-host/v1" /><label className="field-label" htmlFor="gateway-key">YOUR PERSONAL FREE LLM API KEY</label><input id="gateway-key" type="password" autoComplete="off" value={gatewayKey} onChange={event => setGatewayKey(event.target.value)} placeholder="Paste your own gateway key" /><button className="primary-button" disabled={providerSaving || !gatewayUrl.trim() || !gatewayKey.trim()} onClick={() => void saveProviderConnection()}>{providerSaving ? 'Encrypting & saving…' : 'Save my secure provider connection'} <ChevronRight size={16} /></button><p className="helper-text">Each family member connects their own permitted account. Keys are sent only to your HTTPS worker and encrypted before storage; they are never placed in the browser database or shared with other members.</p></> : <p className="helper-text">The secure rendering worker URL is not configured yet. Deploy the worker in the /worker folder, then set VITE_WORKER_API_URL in the frontend build environment.</p>}</div><button className="secondary-button" onClick={() => void loadWorkspace()}><RefreshCw size={16} /> Refresh workspace data</button></div>}
+        {!loading && section === 'Settings' && <div className="page-content inner-page"><div className="eyebrow"><Settings2 size={14} /> WORKSPACE SETTINGS</div><h1>Studio <em>settings.</em></h1><p className="page-lead">Privacy, account and generation preferences.</p><div className="panel settings-list"><div><span>Signed-in account</span><strong>{userEmail}</strong></div><div><span>Workspace</span><strong>{family?.name ?? 'Not created yet'}</strong></div><div><span>Workspace visibility</span><strong><ShieldCheck size={16} /> Private family workspace</strong></div><div><span>Default video length</span><strong>10 minutes</strong></div><div><span>Target output</span><strong>1080p where supported</strong></div><div><span>Rendering worker</span><strong className="pending"><Clock3 size={16} /> Awaiting server setup</strong></div><div><span>Service connection</span><strong>Supabase Auth & Database</strong></div></div><div className="panel provider-panel"><div className="section-heading"><div><span className="eyebrow">CONNECTION STATUS</span><h2>{providerStatus === 'connected' ? 'Provider connected' : providerStatus === 'not_connected' ? 'Provider not connected' : providerStatus === 'checking' ? 'Checking provider…' : 'Status unavailable'}</h2></div><span className={providerStatus === 'connected' ? 'status-pill success' : 'status-pill pending'}>{providerStatus === 'connected' ? 'READY' : providerStatus === 'not_connected' ? 'NOT SET' : 'CHECKING'}</span></div><div className="section-heading"><div><span className="eyebrow">AI PROVIDER</span><h2>Connect your own FreeLLMAPI</h2></div><Sparkles size={20} /></div>{import.meta.env.VITE_WORKER_API_URL ? <><label className="field-label" htmlFor="gateway-url">YOUR PUBLIC HTTPS GATEWAY URL (ENDS IN /v1)</label><input id="gateway-url" value={gatewayUrl} onChange={event => setGatewayUrl(event.target.value)} placeholder="https://your-freellmapi-host/v1" /><label className="field-label" htmlFor="gateway-key">YOUR PERSONAL FREE LLM API KEY</label><input id="gateway-key" type="password" autoComplete="off" value={gatewayKey} onChange={event => setGatewayKey(event.target.value)} placeholder="Paste your own gateway key" /><button className="primary-button" disabled={providerSaving || !gatewayUrl.trim() || !gatewayKey.trim()} onClick={() => void saveProviderConnection()}>{providerSaving ? 'Encrypting & saving…' : 'Save my secure provider connection'} <ChevronRight size={16} /></button><p className="helper-text">Each family member connects their own permitted account. Keys are sent only to your HTTPS worker and encrypted before storage; they are never placed in the browser database or shared with other members.</p></> : <p className="helper-text">The secure rendering worker URL is not configured yet. Deploy the worker in the /worker folder, then set VITE_WORKER_API_URL in the frontend build environment.</p>}</div><button className="secondary-button" onClick={() => void loadWorkspace()}><RefreshCw size={16} /> Refresh workspace data</button></div>}
       </main>
     </div>
   )
