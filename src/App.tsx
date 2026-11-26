@@ -51,6 +51,9 @@ function App() {
   const [quality, setQuality] = useState('1080p')
   const [duration, setDuration] = useState('600')
   const [imageFile, setImageFile] = useState<File | null>(null)
+  const [musicFile, setMusicFile] = useState<File | null>(null)
+  const [narrationEnabled, setNarrationEnabled] = useState(true)
+  const [narrationVoice, setNarrationVoice] = useState('alloy')
   const [gatewayUrl, setGatewayUrl] = useState('')
   const [gatewayKey, setGatewayKey] = useState('')
   const [providerSaving, setProviderSaving] = useState(false)
@@ -230,14 +233,29 @@ function App() {
         })
         if (assetError) throw assetError
       }
+      let backgroundMusicPath: string | null = null
+      if (musicFile) {
+        if (musicFile.size > 50 * 1024 * 1024) throw new Error('Background music must be smaller than 50 MB on the current storage plan.')
+        const safeName = musicFile.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+        backgroundMusicPath = activeFamily.id + '/' + project.id + '/' + crypto.randomUUID() + '-' + safeName
+        const { error: musicUploadError } = await supabase.storage.from('family-projects').upload(backgroundMusicPath, musicFile, { contentType: musicFile.type, upsert: false })
+        if (musicUploadError) throw musicUploadError
+        const { error: musicAssetError } = await supabase.from('project_assets').insert({
+          project_id: project.id, uploaded_by: userId, asset_type: 'audio', storage_path: backgroundMusicPath,
+          file_name: musicFile.name, mime_type: musicFile.type, file_size: musicFile.size
+        })
+        if (musicAssetError) throw musicAssetError
+      }
       const { data: job, error: jobError } = await supabase.from('video_jobs').insert({
         project_id: project.id, requested_by: userId, mode: modeKey[mode], prompt: prompt.trim(),
-        target_duration_seconds: Number(duration), aspect_ratio: aspectRatio, quality_target: quality
+        target_duration_seconds: Number(duration), aspect_ratio: aspectRatio, quality_target: quality,
+        narration_enabled: narrationEnabled, narration_voice: narrationVoice, background_music_path: backgroundMusicPath
       }).select('id').single()
       if (jobError) throw jobError
       setNotice('Video job saved to your private queue. AI generation will start when the secure rendering worker and provider credentials are configured.')
       setPrompt('')
       setImageFile(null)
+      setMusicFile(null)
       await loadWorkspace()
       setSection('My projects')
       if (job?.id) setNotice('Video job ' + job.id.slice(0, 8) + ' is queued. The rendering worker is the remaining activation step.')
@@ -377,6 +395,13 @@ function App() {
             <label className="field-label">CREATION TYPE</label><div className="choice-row">{creationModes.map(item => <button key={item.title} className={`choice ${mode === item.title ? 'selected' : ''}`} onClick={() => setMode(item.title)}>{item.title}</button>)}</div>
             <label className="field-label" htmlFor="video-prompt">YOUR IDEA OR STORY</label><textarea id="video-prompt" className="large-textarea" value={prompt} onChange={event => setPrompt(event.target.value)} placeholder="Describe your video, characters, scenes, visual style, and mood..." rows={7} />
             {mode === 'Image to video' && <div className="upload-field"><label className="field-label" htmlFor="source-image">SOURCE IMAGE (OPTIONAL)</label><label className="upload-drop" htmlFor="source-image"><UploadCloud size={20} /><span>{imageFile ? imageFile.name : 'Choose an image from your phone'}</span><small>JPG, PNG or WebP</small></label><input id="source-image" type="file" accept="image/jpeg,image/png,image/webp" onChange={event => setImageFile(event.target.files?.[0] ?? null)} /></div>}
+            <div className="audio-options panel">
+              <div className="section-heading"><div><span className="eyebrow">AUDIO PRODUCTION</span><h2>Voice & background music</h2></div><Sparkles size={19} /></div>
+              <label className="audio-toggle"><input type="checkbox" checked={narrationEnabled} onChange={event => setNarrationEnabled(event.target.checked)} /><span><strong>AI voice narration</strong><small>Generate spoken narration from your storyboard. Requires an audio/speech model on your FreeLLMAPI gateway.</small></span></label>
+              {narrationEnabled && <div className="audio-field"><label className="field-label" htmlFor="narration-voice">NARRATION VOICE</label><select id="narration-voice" value={narrationVoice} onChange={event => setNarrationVoice(event.target.value)}><option value="alloy">Alloy</option><option value="nova">Nova</option><option value="echo">Echo</option><option value="onyx">Onyx</option><option value="shimmer">Shimmer</option></select></div>}
+              <div className="upload-field audio-upload"><label className="field-label" htmlFor="background-music">BACKGROUND MUSIC (OPTIONAL)</label><label className="upload-drop" htmlFor="background-music"><UploadCloud size={20} /><span>{musicFile ? musicFile.name : 'Choose MP3, WAV, M4A or OGG from your phone'}</span><small>Max 50 MB</small></label><input id="background-music" type="file" accept="audio/mpeg,audio/mp4,audio/wav,audio/x-wav,audio/aac,audio/ogg,.mp3,.m4a,.wav,.aac,.ogg" onChange={event => setMusicFile(event.target.files?.[0] ?? null)} /></div>
+              <p className="helper-text">Narration and music are mixed into the final MP4. Music is automatically looped or trimmed to the video length and lowered under narration.</p>
+            </div>
             <div className="creator-options">
               <div><label className="field-label" htmlFor="quality">VIDEO QUALITY</label><select id="quality" value={quality} onChange={event => setQuality(event.target.value)}><option value="1080p">1080p target</option><option value="720p">720p target</option></select><small>Provider support determines native or upscaled output.</small></div>
               <div><label className="field-label" htmlFor="duration">PROJECT LENGTH</label><select id="duration" value={duration} onChange={event => setDuration(event.target.value)}><option value="30">30 seconds</option><option value="60">1 minute</option><option value="180">3 minutes</option><option value="300">5 minutes</option><option value="600">10 minutes (default)</option><option value="900">15 minutes</option><option value="1800">30 minutes</option><option value="3600">60 minutes</option></select><small>Long videos are assembled from short generated clips.</small></div>
