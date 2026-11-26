@@ -37,7 +37,7 @@ Run these files in order in Supabase **SQL Editor**:
 4. `supabase/migrations/202611270004_audio_production.sql`
 5. `supabase/migrations/202611270005_audio_mix_levels.sql`
 
-They create the family workspace, RLS policies, invitation functions, project scenes/assets, job queue, encrypted provider-connection table, atomic worker claim function, private Storage bucket, automatic recovery leases for interrupted video jobs, and optional narration / background music settings.
+They create the family workspace, RLS policies, invitation functions, project scenes/assets, job queue, encrypted provider-connection table, atomic worker claim function, private Storage bucket, automatic recovery leases for interrupted video jobs, and optional narration / background music settings. Narration prompts prioritize natural human-like delivery.
 
 ## 2. Deploy the frontend PWA
 
