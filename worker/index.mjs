@@ -263,8 +263,10 @@ async function processJob(job) {
     const concatPath = join(workDir, 'clips.txt')
     await writeFile(concatPath, normalized.map(path => `file '${path.replace(/'/g, "'\\''")}'`).join('\n'))
     const outputPath = join(workDir, 'final.mp4')
-    await run('ffmpeg', ['-y','-f','concat','-safe','0','-i',concatPath,'-c','copy','-movflags','+faststart',outputPath])
+    const targetBitrate = Math.max(160000, Math.floor((48 * 1024 * 1024 * 8 * 0.9) / job.target_duration_seconds))
+    await run('ffmpeg', ['-y','-f','concat','-safe','0','-i',concatPath,'-c:v','libx264','-preset','veryfast','-b:v',String(targetBitrate),'-maxrate',String(targetBitrate),'-bufsize',String(targetBitrate * 2),'-pix_fmt','yuv420p','-an','-movflags','+faststart',outputPath])
     const output = await readFile(outputPath)
+    if (output.length > 50 * 1024 * 1024) throw new Error('Final MP4 exceeds the current 50 MB storage limit. Use a shorter video or upgrade storage before rendering longer videos.')
     const storagePath = `${project.family_id}/${project.id}/renders/${job.id}.mp4`
     const { error: uploadError } = await supabase.storage.from('family-projects').upload(storagePath, output, { contentType: 'video/mp4', upsert: true })
     if (uploadError) throw uploadError
