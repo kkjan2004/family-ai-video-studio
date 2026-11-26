@@ -36,6 +36,16 @@ Run these files in order in Supabase **SQL Editor**:
 
 They create the family workspace, RLS policies, invitation functions, project scenes/assets, job queue, encrypted provider-connection table, atomic worker claim function and private Storage bucket.
 
+## 2. Deploy the frontend PWA
+
+The repository includes `vercel.json` for a Vite single-page app. Import the private GitHub repository into Vercel and set these build environment variables before deploying:
+
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+- `VITE_WORKER_API_URL` (after the worker is deployed)
+
+Redeploy after changing environment variables. Then add the Vercel deployment URL to Supabase Authentication → URL Configuration and set it as the Site URL.
+
 ## 3. Deploy the rendering worker
 
 Deploy the `worker/` folder as a Docker web service on a host that supports a long-running process and FFmpeg. GitHub Pages and Supabase Edge Functions are not suitable for the long-running FFmpeg worker.
@@ -90,16 +100,6 @@ Fill only the public frontend values in `.env.local`. Never commit real environm
 - Provider credentials are stored only in the server-side table and encrypted by the worker.
 - Private media is stored in a non-public bucket and downloaded using short-lived signed URLs.
 - Review provider terms and quotas before enabling generation for family members.
-
-## 2. Deploy the frontend PWA
-
-The repository includes `vercel.json` for a Vite single-page app. Import the private GitHub repository into Vercel and set these build environment variables before deploying:
-
-- `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_ANON_KEY`
-- `VITE_WORKER_API_URL` (after the worker is deployed)
-
-Redeploy after changing environment variables. Then add the Vercel deployment URL to Supabase Authentication → URL Configuration and set it as the Site URL.
 
 ## CI
 
