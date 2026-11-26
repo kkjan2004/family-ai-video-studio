@@ -206,6 +206,13 @@ async function planStoryboard({ baseUrl, apiKey, model, prompt, durationSeconds 
 }
 async function processJob(job) {
   const workDir = await mkdtemp(join(tmpdir(), 'family-video-'))
+  const heartbeat = setInterval(() => {
+    void supabase.from('video_jobs')
+      .update({ lease_expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString() })
+      .eq('id', job.id)
+      .in('status', ['planning', 'generating', 'rendering'])
+      .then(({ error }) => { if (error) console.error('Job lease heartbeat failed:', job.id, error.message) })
+  }, 60_000)
   try {
     const [{ data: project, error: projectError }, { data: connection, error: connectionError }] = await Promise.all([
       supabase.from('projects').select('id,family_id,title').eq('id', job.project_id).single(),
@@ -276,16 +283,17 @@ async function processJob(job) {
       mime_type: 'video/mp4', file_size: output.length
     }).select('id').single()
     if (assetError) throw assetError
-    await updateJob(job.id, { status: 'completed', progress: 100, output_asset_id: asset.id, completed_at: new Date().toISOString() })
+    await updateJob(job.id, { status: 'completed', progress: 100, output_asset_id: asset.id, completed_at: new Date().toISOString(), lease_expires_at: null })
     await supabase.from('projects').update({ status: 'completed' }).eq('id', project.id)
     await event(job.id, 'completed', 'Your MP4 video is ready in My Projects.', 100)
   } catch (error) {
     const message = error instanceof Error ? error.message.slice(0, 1800) : 'Video rendering failed.'
-    await updateJob(job.id, { status: 'failed', error_message: message, completed_at: new Date().toISOString() }).catch(() => {})
+    await updateJob(job.id, { status: 'failed', error_message: message, completed_at: new Date().toISOString(), lease_expires_at: null }).catch(() => {})
     if (job.project_id) await supabase.from('projects').update({ status: 'failed' }).eq('id', job.project_id).catch(() => {})
     await event(job.id, 'failed', message).catch(() => {})
     console.error('Job failed:', job.id, message)
   } finally {
+    clearInterval(heartbeat)
     await rm(workDir, { recursive: true, force: true })
   }
 }
