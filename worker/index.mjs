@@ -214,7 +214,7 @@ async function processJob(job) {
     }
     const storyboard = await planStoryboard({ baseUrl: connection.base_url, apiKey, model: connection.model, prompt: job.prompt, durationSeconds: job.target_duration_seconds })
     await supabase.from('project_scenes').delete().eq('project_id', job.project_id)
-    const { error: sceneError } = await supabase.from('project_scenes').insert(storyboard)
+    const { error: sceneError } = await supabase.from('project_scenes').insert(storyboard.map(scene => ({ ...scene, project_id: job.project_id })))
     if (sceneError) throw sceneError
     const clipSeconds = 6
     const clipCount = Math.ceil(job.target_duration_seconds / clipSeconds)
