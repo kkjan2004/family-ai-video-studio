@@ -111,7 +111,7 @@ const server = http.createServer(async (req, res) => {
       if (!String(body.apiKey || '').trim() || String(body.apiKey).length > 4096) throw new Error('Enter a valid API key.')
       const baseUrl = base.toString().replace(/\/$/, '')
       if (!baseUrl.endsWith('/v1')) throw new Error('Base URL must end with /v1 (example: https://your-host/v1).')
-      const verification = await fetch(baseUrl + '/models?available=true', { headers: { authorization: 'Bearer ' + String(body.apiKey).trim() }, signal: AbortSignal.timeout(20000) })
+      const verification = await fetch(baseUrl + '/models?available=true', { headers: { authorization: 'Bearer ' + String(body.apiKey).trim() }, signal: AbortSignal.timeout(20000), redirect: 'error' })
       if (!verification.ok) throw new Error('FreeLLMAPI connection check failed with HTTP ' + verification.status + '.')
       const { error } = await supabase.from('provider_connections').upsert({
         user_id: user.id,
@@ -163,7 +163,8 @@ async function generateClip({ baseUrl, apiKey, model, prompt, duration, aspectRa
       aspect_ratio: aspectRatio,
       ...(imageUrl ? { image: imageUrl } : {})
     }),
-    signal: AbortSignal.timeout(300000)
+    signal: AbortSignal.timeout(300000),
+    redirect: 'error'
   })
   if (!response.ok) {
     const detail = (await response.text()).slice(0, 1200)
@@ -191,7 +192,8 @@ async function generateSpeech({ baseUrl, apiKey, text, voice, model }) {
     method: 'POST',
     headers,
     body: JSON.stringify(naturalBody),
-    signal: AbortSignal.timeout(120000)
+    signal: AbortSignal.timeout(120000),
+    redirect: 'error'
   })
   if (!response.ok) {
     const detail = (await response.text()).slice(0, 1000)
@@ -255,7 +257,8 @@ async function planStoryboard({ baseUrl, apiKey, model, prompt, durationSeconds 
           { role: 'user', content: `Create exactly ${count} sequential storyboard scenes for this ${durationSeconds}-second video. The overall concept is: ${prompt}. Return {"scenes":[{"title":"...","visual_prompt":"...","narration":"..."}]}.` }
         ]
       }),
-      signal: AbortSignal.timeout(90000)
+      signal: AbortSignal.timeout(90000),
+      redirect: 'error'
     })
     if (!response.ok) throw new Error('Storyboard planner returned HTTP ' + response.status)
     const payload = await response.json()
