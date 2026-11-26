@@ -149,9 +149,9 @@ begin
 
   if exists (
     select 1 from public.family_members
-    where user_id = current_user_id and role = 'owner'
+    where user_id = current_user_id
   ) then
-    raise exception 'You already own a family workspace';
+    raise exception 'You already belong to a family workspace';
   end if;
 
   insert into public.families(name, created_by)
