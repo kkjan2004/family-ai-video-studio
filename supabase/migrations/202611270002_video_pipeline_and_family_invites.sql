@@ -157,9 +157,8 @@ begin
   if lower(coalesce(auth.jwt() ->> 'email','')) <> invitation.email then
     raise exception 'Sign in with the email address that received this invitation';
   end if;
-  if exists (select 1 from public.family_members fm
-    where fm.family_id = invitation.family_id and fm.user_id = auth.uid()) then
-    raise exception 'You are already a member of this family';
+  if exists (select 1 from public.family_members fm where fm.user_id = auth.uid()) then
+    raise exception 'This account already belongs to a family workspace';
   end if;
   insert into public.family_members(family_id,user_id,role)
   values (invitation.family_id,auth.uid(),invitation.role);
