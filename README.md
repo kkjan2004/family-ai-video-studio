@@ -1,26 +1,70 @@
 # Family AI Video Studio
 
-A private, family-focused AI video studio designed for mobile-first use.
+A private, mobile-first AI video studio for one family workspace with separate member accounts.
 
-## Project status
+## Current implementation
 
-**Phase 2 — authentication foundation added.** The React + TypeScript + Vite PWA now includes a Supabase email/password sign-in and registration gate. Authentication requires the frontend environment variables described below. Family roles, invitations, database policies, AI-provider connections, background rendering, and video downloads are not connected yet.
+- React + TypeScript + Vite installable PWA.
+- Supabase email/password authentication.
+- Private family workspace creation, member roles and email-bound invitation links.
+- Family-shared and creator-private projects with database Row Level Security.
+- Storyboard, media asset and video job database structures.
+- Private Supabase Storage bucket for project media and rendered MP4 files.
+- Per-member FreeLLMAPI connection setup. Provider keys are encrypted by the trusted worker and are not exposed to the browser or other family members.
+- Node.js + FFmpeg worker that claims jobs, requests short MP4 clips, normalizes them and stitches a final MP4.
+- Signed browser download links for completed videos.
 
-## Configure Supabase Auth
+A successful frontend build does not mean the cloud services are already configured. Apply both SQL migrations and deploy the worker before generation can run.
 
-1. Create or open your Supabase project.
-2. In Project Settings → API, copy the Project URL and the Publishable key (or legacy anon public key).
-3. In your frontend hosting/build environment, set:
+## 1. Supabase setup
+
+1. Create a Supabase project (Mumbai region is preferred for an India-based workspace, if available).
+2. In **Project Settings → API**, copy the Project URL and Publishable key (or legacy anon public key).
+3. Set the frontend build variables:
    - `VITE_SUPABASE_URL`
    - `VITE_SUPABASE_ANON_KEY`
-4. In Supabase Authentication → URL Configuration, add your deployed app URL to Site URL and allowed Redirect URLs.
-5. Keep email confirmation enabled for registration until the project owner deliberately changes the policy.
+   - `VITE_WORKER_API_URL` (after the worker is deployed)
+4. In **Authentication → URL Configuration**, add the exact deployed PWA URL to Site URL and Redirect URLs.
+5. Keep email confirmation enabled for new accounts.
 
-The browser key is a public client key. It is not a substitute for database security. Enable Row Level Security on every user-data table before storing private family data.
+### Apply database migrations
 
-## Local development
+Run these files in order in Supabase **SQL Editor**:
 
-Requirements: Node.js 20+
+1. `supabase/migrations/202611270001_initial_family_schema.sql`
+2. `supabase/migrations/202611270002_video_pipeline_and_family_invites.sql`
+
+They create the family workspace, RLS policies, invitation functions, project scenes/assets, job queue, encrypted provider-connection table, atomic worker claim function and private Storage bucket.
+
+## 2. Deploy the rendering worker
+
+Deploy the `worker/` folder as a Docker web service on a host that supports a long-running process and FFmpeg. GitHub Pages and Supabase Edge Functions are not suitable for the long-running FFmpeg worker.
+
+Set the worker environment variables from `worker/.env.example`:
+
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY` — server only; never put this in the frontend.
+- `PROVIDER_CREDENTIALS_ENCRYPTION_KEY` — 64 hex characters (32 random bytes).
+- `APP_ORIGIN` — exact frontend origin, including https.
+- Optional `PORT` and `POLL_INTERVAL_MS`.
+
+Generate a 32-byte encryption key using a trusted password manager or secure random generator. Keep a backup: changing it makes previously encrypted provider credentials unreadable.
+
+After deployment, set frontend build variable `VITE_WORKER_API_URL` to the worker's HTTPS origin.
+
+## 3. Connect each member's own video gateway
+
+In Studio → Settings, each member can connect their own permitted FreeLLMAPI gateway:
+
+- Base URL must be public HTTPS and end in `/v1`.
+- The key is posted to the worker over HTTPS and encrypted using AES-256-GCM before storage.
+- The worker uses only the key belonging to the member who submitted that job.
+- Do not share one owner's personal FreeLLMAPI key, account or quota with other family members unless the provider explicitly allows it.
+- The worker calls `POST /v1/videos/generations`; provider/model duration and aspect-ratio support can vary.
+
+## 4. Local frontend development
+
+Requirements: Node.js 20+.
 
 ```bash
 npm install
@@ -28,31 +72,25 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Fill in the two public Supabase values in `.env.local`. Never commit real environment files.
+Fill only the public frontend values in `.env.local`. Never commit real environment files.
 
-## Security requirements
+## Product behavior and limits
 
-- Never put Supabase service-role keys or AI provider API keys in browser code or any `VITE_` variable.
-- Use Supabase Auth for individual accounts.
-- Enforce family membership, roles, and project permissions with database Row Level Security and server-side checks.
-- FreeLLMAPI is treated as a single-user/local-first gateway. Do not share one owner's key or proxy one account's generation quota for other family members unless the provider explicitly permits it.
-- GitHub Pages can host static frontend files only; it cannot run FFmpeg or long-running rendering jobs.
-- Rendering requires a separate server/worker runtime. Free-tier quotas and provider terms must be checked before enabling generation.
+- Text-to-video, image-to-video and story-to-movie jobs are saved to the private queue.
+- The worker currently generates 6-second clips, normalizes them with FFmpeg, and stitches them into MP4.
+- Longer videos require many provider requests; completion time and availability depend on each member's provider quota and provider support.
+- The worker targets 1080-sized frames, but this does not guarantee native 1080p source quality.
+- Current worker output is silent (no narration/music mixing yet). Advanced storyboard editing, audio tracks, retries/resume and richer job controls remain future enhancements.
+- Supabase Storage has a 500 MB per-object limit configured by the migration; adjust only after checking your plan's storage limits.
 
-## Product goals
+## Security
 
-- Private family workspace with separate member accounts and owner-managed invitations.
-- Text-to-video, image-to-video, story-to-movie, cinematic, animation, educational, promotional, and social-video workflows.
-- Cloud generation jobs with progress and a browser-based download flow.
-- Target 1080p output where supported; clearly identify native versus upscaled output.
-- Support longer projects by generating provider-supported clips and stitching them in a background worker. A single 10-minute generation is not assumed.
+- Never place Supabase service-role keys, encryption keys or AI provider API keys in browser code, GitHub source or any `VITE_*` variable.
+- User data tables use Row Level Security; invitations are bound to the invited email and expire after seven days.
+- Provider credentials are stored only in the server-side table and encrypted by the worker.
+- Private media is stored in a non-public bucket and downloaded using short-lived signed URLs.
+- Review provider terms and quotas before enabling generation for family members.
 
-## Development sequence
+## CI
 
-1. PWA shell and responsive workspace UI.
-2. Supabase authentication foundation.
-3. Family membership, invitations, roles, and Row Level Security.
-4. Project/storyboard data model and secure file storage.
-5. Server-side AI provider adapters and job queue.
-6. Background FFmpeg rendering, progress tracking, and mobile downloads.
-7. Security review and end-to-end acceptance tests.
+GitHub Actions runs the TypeScript/Vite production build and checks worker JavaScript syntax.
