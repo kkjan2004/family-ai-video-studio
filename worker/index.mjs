@@ -177,22 +177,47 @@ async function generateClip({ baseUrl, apiKey, model, prompt, duration, aspectRa
   return Buffer.from(await response.arrayBuffer())
 }
 async function generateSpeech({ baseUrl, apiKey, text, voice, model }) {
-  const response = await fetch(baseUrl + '/audio/speech', {
+  const selectedModel = model || process.env.TTS_MODEL || 'auto'
+  const headers = { authorization: 'Bearer ' + apiKey, 'content-type': 'application/json' }
+  const naturalBody = {
+    model: selectedModel,
+    input: text,
+    voice: voice || 'alloy',
+    response_format: 'mp3',
+    speed: 0.96,
+    instructions: 'Speak like a real, warm, emotionally present human narrator, never like a robotic AI voice. Use natural conversational rhythm, varied intonation, gentle emphasis on meaningful words, realistic pauses at commas and sentence endings, and smooth connected phrasing. Sound relaxed, sincere and engaging, as if telling this story directly to one person. Avoid a flat, overly polished announcer tone, exaggerated drama, artificial cheerfulness, and mechanically equal pacing. Pronounce every word clearly and naturally in the language of the supplied text. Do not read punctuation or stage directions aloud.'
+  }
+  let response = await fetch(baseUrl + '/audio/speech', {
     method: 'POST',
-    headers: { authorization: 'Bearer ' + apiKey, 'content-type': 'application/json' },
-    body: JSON.stringify({
-      model: model || process.env.TTS_MODEL || 'auto',
-      input: text,
-      voice: voice || 'alloy',
-      response_format: 'mp3',
-      speed: 0.96,
-      instructions: 'Speak like a real, warm, emotionally present human narrator, never like a robotic AI voice. Use natural conversational rhythm, varied intonation, gentle emphasis on meaningful words, realistic pauses at commas and sentence endings, and smooth connected phrasing. Sound relaxed, sincere and engaging, as if telling this story directly to one person. Avoid a flat, overly polished announcer tone, exaggerated drama, artificial cheerfulness, and mechanically equal pacing. Pronounce every word clearly and naturally in the language of the supplied text. Do not read punctuation or stage directions aloud.'
-    }),
+    headers,
+    body: JSON.stringify(naturalBody),
     signal: AbortSignal.timeout(120000)
   })
   if (!response.ok) {
     const detail = (await response.text()).slice(0, 1000)
-    throw new Error('AI narration is not available from this gateway (HTTP ' + response.status + '). Disable AI narration or configure a compatible speech model. ' + detail)
+    const optionalFieldRejected = [400, 422].includes(response.status)
+      && /instructions|speed|unknown field|unsupported parameter|unrecognized.*(field|parameter)/i.test(detail)
+    if (optionalFieldRejected) {
+      // Some OpenAI-compatible TTS providers reject optional prosody fields.
+      // Retry once with the portable request shape rather than failing the video.
+      response = await fetch(baseUrl + '/audio/speech', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          model: selectedModel,
+          input: text,
+          voice: voice || 'alloy',
+          response_format: 'mp3'
+        }),
+        signal: AbortSignal.timeout(120000)
+      })
+      if (!response.ok) {
+        const retryDetail = (await response.text()).slice(0, 1000)
+        throw new Error('AI narration is not available from this gateway (HTTP ' + response.status + '). Disable AI narration or configure a compatible speech model. ' + retryDetail)
+      }
+    } else {
+      throw new Error('AI narration is not available from this gateway (HTTP ' + response.status + '). Disable AI narration or configure a compatible speech model. ' + detail)
+    }
   }
   const contentType = response.headers.get('content-type') || ''
   if (!contentType.includes('audio') && !contentType.includes('octet-stream')) {
