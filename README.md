@@ -33,6 +33,7 @@ Run these files in order in Supabase **SQL Editor**:
 
 1. `supabase/migrations/202611270001_initial_family_schema.sql`
 2. `supabase/migrations/202611270002_video_pipeline_and_family_invites.sql`
+3. `supabase/migrations/202611270003_video_job_recovery.sql`
 
 They create the family workspace, RLS policies, invitation functions, project scenes/assets, job queue, encrypted provider-connection table, atomic worker claim function and private Storage bucket.
 
