@@ -348,15 +348,15 @@ async function processJob(job) {
       const args = ['-y','-i',silentPath,'-i',narrationPath]
       if (backgroundMusicPath) args.push('-stream_loop','-1','-i',backgroundMusicPath)
       if (backgroundMusicPath) {
-        args.push('-filter_complex','[1:a]volume=1.0[narr];[2:a]volume=0.18[music];[narr][music]amix=inputs=2:duration=first:dropout_transition=2[aout]','-map','0:v:0','-map','[aout]')
+        args.push('-filter_complex',`[1:a]volume=${Math.max(0, Math.min(1.5, Number(job.narration_volume ?? 1)))}[narr];[2:a]volume=${Math.max(0, Math.min(1, Number(job.music_volume ?? 0.18)))}[music];[narr][music]amix=inputs=2:duration=first:dropout_transition=2[aout]`,'-map','0:v:0','-map','[aout]')
       } else {
-        args.push('-filter_complex','[1:a]volume=1.0[aout]','-map','0:v:0','-map','[aout]')
+        args.push('-filter_complex',`[1:a]volume=${Math.max(0, Math.min(1.5, Number(job.narration_volume ?? 1)))}[aout]`,'-map','0:v:0','-map','[aout]')
       }
       args.push('-c:v','copy','-c:a','aac','-b:a','128k','-t',String(job.target_duration_seconds),'-movflags','+faststart',outputPath)
       await run('ffmpeg', args)
       finalPath = outputPath
     } else if (backgroundMusicPath) {
-      await run('ffmpeg', ['-y','-i',silentPath,'-stream_loop','-1','-i',backgroundMusicPath,'-filter_complex','[1:a]volume=0.22[aout]','-map','0:v:0','-map','[aout]','-c:v','copy','-c:a','aac','-b:a','128k','-t',String(job.target_duration_seconds),'-movflags','+faststart',outputPath])
+      await run('ffmpeg', ['-y','-i',silentPath,'-stream_loop','-1','-i',backgroundMusicPath,'-filter_complex',`[1:a]volume=${Math.max(0, Math.min(1, Number(job.music_volume ?? 0.18)))}[aout]`,'-map','0:v:0','-map','[aout]','-c:v','copy','-c:a','aac','-b:a','128k','-t',String(job.target_duration_seconds),'-movflags','+faststart',outputPath])
       finalPath = outputPath
     }
     const output = await readFile(finalPath)
