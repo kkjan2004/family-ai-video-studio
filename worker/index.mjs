@@ -147,6 +147,7 @@ async function processJob(job) {
     const clipSeconds = 6
     const clipCount = Math.ceil(job.target_duration_seconds / clipSeconds)
     const normalized = []
+    await supabase.from('projects').update({ status: 'processing' }).eq('id', project.id)
     await updateJob(job.id, { status: 'generating', progress: 2, provider: 'freellmapi' })
     await event(job.id, 'started', `Preparing ${clipCount} short clips.`, 2)
     for (let index = 0; index < clipCount; index++) {
@@ -194,10 +195,12 @@ async function processJob(job) {
     }).select('id').single()
     if (assetError) throw assetError
     await updateJob(job.id, { status: 'completed', progress: 100, output_asset_id: asset.id, completed_at: new Date().toISOString() })
+    await supabase.from('projects').update({ status: 'completed' }).eq('id', project.id)
     await event(job.id, 'completed', 'Your MP4 video is ready in My Projects.', 100)
   } catch (error) {
     const message = error instanceof Error ? error.message.slice(0, 1800) : 'Video rendering failed.'
     await updateJob(job.id, { status: 'failed', error_message: message, completed_at: new Date().toISOString() }).catch(() => {})
+    if (job.project_id) await supabase.from('projects').update({ status: 'failed' }).eq('id', job.project_id).catch(() => {})
     await event(job.id, 'failed', message).catch(() => {})
     console.error('Job failed:', job.id, message)
   } finally {
