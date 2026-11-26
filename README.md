@@ -114,4 +114,4 @@ Fill only the public frontend values in `.env.local`. Never commit real environm
 
 ## CI
 
-GitHub Actions runs the TypeScript/Vite production build, checks worker JavaScript syntax, and installs worker dependencies. A passing CI run validates code/build checks only; it does not apply Supabase migrations, deploy the PWA or worker, or prove a live provider TTS/video request.
+GitHub Actions runs the TypeScript/Vite production build, checks worker JavaScript syntax, installs worker dependencies, and builds the FFmpeg worker Docker image without publishing it. A passing CI run validates code/build checks only; it does not apply Supabase migrations, deploy the PWA or worker, or prove a live provider TTS/video request.
