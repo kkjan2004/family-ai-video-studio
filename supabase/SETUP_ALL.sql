@@ -473,7 +473,10 @@ create policy "family_storage_upload_project_members" on storage.objects
 for insert to authenticated with check (
   bucket_id = 'family-projects'
   and owner_id = (select auth.uid())::text
-  and public.can_access_project(((storage.foldername(name))[2])::uuid)
+  and public.can_access_family_project_path(
+    ((storage.foldername(name))[1])::uuid,
+    ((storage.foldername(name))[2])::uuid
+  )
 );
 drop policy if exists "family_storage_delete_owner_or_uploader" on storage.objects;
 create policy "family_storage_delete_owner_or_uploader" on storage.objects
