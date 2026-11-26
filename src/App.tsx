@@ -246,7 +246,7 @@ function App() {
   }
 
   async function refreshProviderStatus() {
-    const workerUrl = import.meta.env.VITE_WORKER_API_URL?.trim().replace(/\\/$/, '')
+    const workerUrl = import.meta.env.VITE_WORKER_API_URL?.trim().replace(/\/+$/, '')
     if (!supabase || !workerUrl) { setProviderStatus('unavailable'); return }
     try {
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
