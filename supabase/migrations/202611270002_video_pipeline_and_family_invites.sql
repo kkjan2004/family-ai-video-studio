@@ -245,7 +245,7 @@ grant execute on function public.can_access_family_project_path(uuid,uuid) to au
 
 -- Private object bucket. Paths must start with family_id/project_id.
 insert into storage.buckets(id,name,public,file_size_limit,allowed_mime_types)
-values ('family-projects','family-projects',false,524288000,
+values ('family-projects','family-projects',false,52428800,
   array['image/jpeg','image/png','image/webp','video/mp4','video/webm','audio/mpeg','audio/wav','text/vtt'])
 on conflict (id) do update set public=false;
 
