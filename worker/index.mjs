@@ -176,12 +176,12 @@ async function generateClip({ baseUrl, apiKey, model, prompt, duration, aspectRa
   }
   return Buffer.from(await response.arrayBuffer())
 }
-async function generateSpeech({ baseUrl, apiKey, text, voice }) {
+async function generateSpeech({ baseUrl, apiKey, text, voice, model }) {
   const response = await fetch(baseUrl + '/audio/speech', {
     method: 'POST',
     headers: { authorization: 'Bearer ' + apiKey, 'content-type': 'application/json' },
     body: JSON.stringify({
-      model: process.env.TTS_MODEL || 'auto',
+      model: model || process.env.TTS_MODEL || 'auto',
       input: text,
       voice: voice || 'alloy',
       response_format: 'mp3',
@@ -198,7 +198,9 @@ async function generateSpeech({ baseUrl, apiKey, text, voice }) {
   if (!contentType.includes('audio') && !contentType.includes('octet-stream')) {
     throw new Error('The speech endpoint did not return an audio file. Disable AI narration or check your gateway TTS support.')
   }
-  return Buffer.from(await response.arrayBuffer())
+  const routedVia = response.headers.get('x-routed-via') || ''
+  const routedModel = routedVia.includes('/') ? routedVia.slice(routedVia.indexOf('/') + 1) : ''
+  return { audio: Buffer.from(await response.arrayBuffer()), routedModel }
 }
 async function downloadPrivateAsset(storagePath, workDir, filename) {
   const { data, error } = await supabase.storage.from('family-projects').createSignedUrl(storagePath, 600)
@@ -284,6 +286,7 @@ async function processJob(job) {
     const clipCount = Math.ceil(job.target_duration_seconds / clipSeconds)
     const normalized = []
     const narrationSegments = []
+    let stableTtsModel = process.env.TTS_MODEL || 'auto'
     if (job.narration_enabled) {
       await event(job.id, 'audio_planning', 'Preparing AI voice narration for the storyboard.', 2)
       for (let index = 0; index < storyboard.length; index++) {
@@ -293,9 +296,10 @@ async function processJob(job) {
           : Math.min(scene.duration_seconds, Math.max(1, job.target_duration_seconds - storyboard.slice(0, index).reduce((sum, item) => sum + item.duration_seconds, 0)))
         const audioPath = join(workDir, 'narration-' + String(index).padStart(3, '0') + '.wav')
         if (scene.narration.trim()) {
-          const speech = await generateSpeech({ baseUrl: connection.base_url, apiKey, text: scene.narration, voice: job.narration_voice })
+          const speech = await generateSpeech({ baseUrl: connection.base_url, apiKey, text: scene.narration, voice: job.narration_voice, model: stableTtsModel })
+          if (stableTtsModel === 'auto' && speech.routedModel) stableTtsModel = speech.routedModel
           const speechPath = join(workDir, 'speech-' + String(index).padStart(3, '0') + '.mp3')
-          await writeFile(speechPath, speech)
+          await writeFile(speechPath, speech.audio)
           await run('ffmpeg', ['-y','-i',speechPath,'-af',`apad,atrim=0:${sceneDuration},asetpts=N/SR/TB`,'-ar','44100','-ac','2','-c:a','pcm_s16le',audioPath])
         } else {
           await run('ffmpeg', ['-y','-f','lavfi','-i','anullsrc=r=44100:cl=stereo','-t',String(sceneDuration),'-c:a','pcm_s16le',audioPath])
