@@ -14,7 +14,7 @@ A private, mobile-first AI video studio for one family workspace with separate m
 - Node.js + FFmpeg worker that claims jobs, requests short MP4 clips, normalizes them and stitches a final MP4 with optional AI narration and uploaded background music.
 - Signed browser download links for completed videos.
 
-A successful frontend build does not mean the cloud services are already configured. Apply all four SQL migrations and deploy the worker before generation can run.
+A successful frontend build does not mean the cloud services are already configured. Apply all five SQL migrations and deploy the worker before generation can run.
 
 ## 1. Supabase setup
 
@@ -35,6 +35,7 @@ Run these files in order in Supabase **SQL Editor**:
 2. `supabase/migrations/202611270002_video_pipeline_and_family_invites.sql`
 3. `supabase/migrations/202611270003_video_job_recovery.sql`
 4. `supabase/migrations/202611270004_audio_production.sql`
+5. `supabase/migrations/202611270005_audio_mix_levels.sql`
 
 They create the family workspace, RLS policies, invitation functions, project scenes/assets, job queue, encrypted provider-connection table, atomic worker claim function, private Storage bucket, automatic recovery leases for interrupted video jobs, and optional narration / background music settings.
 
