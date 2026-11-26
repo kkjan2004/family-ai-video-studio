@@ -16,6 +16,10 @@ A private, mobile-first AI video studio for one family workspace with separate m
 
 A successful frontend build does not mean the cloud services are already configured. Apply all five SQL migrations and deploy the worker before generation can run.
 
+## One-page deployment runbook
+
+For the complete end-to-end setup in one place, follow [`DEPLOYMENT_BULK_CHECKLIST.md`](./DEPLOYMENT_BULK_CHECKLIST.md). It covers Supabase, Vercel, the Docker worker, environment variables and final live tests.
+
 ## 1. Supabase setup
 
 1. Create a Supabase project (Mumbai region is preferred for an India-based workspace, if available).
