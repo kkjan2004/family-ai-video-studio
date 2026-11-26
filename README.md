@@ -91,7 +91,7 @@ Fill only the public frontend values in `.env.local`. Never commit real environm
 - Longer videos require many provider requests; completion time and availability depend on each member's provider quota and provider support.
 - The worker targets 1080-sized frames, but this does not guarantee native 1080p source quality.
 - Current worker output is silent (no narration/music mixing yet). Advanced storyboard editing, audio tracks, retries/resume and richer job controls remain future enhancements.
-- Supabase Storage has a 500 MB per-object limit configured by the migration; adjust only after checking your plan's storage limits.
+- The private Supabase Storage bucket is set to 50 MB per object to fit the current Free-plan global file limit. Long 1080p videos may exceed this cap; the worker compresses output and rejects files above 50 MB. Larger files require a higher Supabase plan or a separate object-storage service.
 
 ## Security
 
