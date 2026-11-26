@@ -114,6 +114,11 @@ const server = http.createServer(async (req, res) => {
   return send(res, 404, { error: 'Not found' })
 })
 
+function outputSize(aspectRatio, quality) {
+  const scale = quality === '720p' ? 0.6666667 : 1
+  const base = aspectRatio === '9:16' ? [1080,1920] : aspectRatio === '1:1' ? [1080,1080] : aspectRatio === '4:5' ? [1080,1350] : [1920,1080]
+  return base.map(value => Math.round(value * scale / 2) * 2)
+}
 function run(command, args, options = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, { ...options, stdio: ['ignore', 'ignore', 'pipe'] })
@@ -243,9 +248,7 @@ async function processJob(job) {
         imageUrl: index === 0 ? imageUrl : null
       })
       await writeFile(rawPath, buffer)
-      const portrait = job.aspect_ratio === '9:16' || job.aspect_ratio === '4:5'
-      const width = portrait ? 1080 : 1920
-      const height = portrait ? 1920 : 1080
+      const [width, height] = outputSize(job.aspect_ratio, job.quality_target)
       await run('ffmpeg', ['-y','-i',rawPath,'-vf',`scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,fps=30`,'-c:v','libx264','-preset','veryfast','-crf','23','-pix_fmt','yuv420p','-an',normalizedPath])
       normalized.push(normalizedPath)
       const progress = Math.min(90, Math.round(((index + 1) / clipCount) * 88) + 2)
