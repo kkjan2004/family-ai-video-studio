@@ -234,13 +234,13 @@ for each row execute function public.set_updated_at();
 -- Verify that a storage path's family and project IDs match the same database row.
 create or replace function public.can_access_family_project_path(target_family_id uuid, target_project_id uuid)
 returns boolean language sql stable security definer set search_path = ''
-as $
+as $$
   select exists (
     select 1 from public.projects p
     where p.id = target_project_id and p.family_id = target_family_id
       and public.can_access_project(p.id)
   );
-$;
+$$;
 revoke all on function public.can_access_family_project_path(uuid,uuid) from public;
 grant execute on function public.can_access_family_project_path(uuid,uuid) to authenticated;
 
