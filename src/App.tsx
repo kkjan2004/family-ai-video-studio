@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Clapperboard, Film, FolderOpen, Home, ImagePlus, Menu, Plus,
   Settings2, ShieldCheck, Sparkles, WandSparkles, X, Clock3,
-  ChevronRight, Play, Users, Copy, LogOut, RefreshCw, Video,
+  ChevronRight, Play, Users, Copy, LogOut, RefreshCw,
   LoaderCircle, CheckCircle2, AlertCircle, UploadCloud, UserPlus
 } from 'lucide-react'
 import { supabase } from './lib/supabase'
