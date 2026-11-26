@@ -180,7 +180,7 @@ async function generateSpeech({ baseUrl, apiKey, text, voice }) {
   const response = await fetch(baseUrl + '/audio/speech', {
     method: 'POST',
     headers: { authorization: 'Bearer ' + apiKey, 'content-type': 'application/json' },
-    body: JSON.stringify({ model: process.env.TTS_MODEL || 'tts-1', input: text, voice: voice || 'alloy', response_format: 'mp3' }),
+    body: JSON.stringify({\n      model: process.env.TTS_MODEL || 'auto',\n      input: text,\n      voice: voice || 'alloy',\n      response_format: 'mp3',\n      speed: 0.96,\n      instructions: 'Speak like a real, warm, emotionally present human narrator, never like a robotic AI voice. Use natural conversational rhythm, varied intonation, gentle emphasis on meaningful words, realistic pauses at commas and sentence endings, and smooth connected phrasing. Sound relaxed, sincere and engaging, as if telling this story directly to one person. Avoid a flat, overly polished announcer tone, exaggerated drama, artificial cheerfulness, and mechanically equal pacing. Pronounce every word clearly and naturally in the language of the supplied text. Do not read punctuation or stage directions aloud.'\n    }),
     signal: AbortSignal.timeout(120000)
   })
   if (!response.ok) {
@@ -215,7 +215,7 @@ async function planStoryboard({ baseUrl, apiKey, model, prompt, durationSeconds 
         temperature: 0.7,
         response_format: { type: 'json_object' },
         messages: [
-          { role: 'system', content: 'You are a film storyboard director. Return valid JSON only with a scenes array. Each scene must have title, visual_prompt, and narration. Keep characters, costumes, setting and visual style consistent. Make each scene visually filmable and sequential.' },
+          { role: 'system', content: 'You are an experienced film director and natural dialogue writer. Return valid JSON only with a scenes array. Each scene must have title, visual_prompt, and narration. Write narration in the same language as the user's concept, using natural spoken language rather than stiff written prose. Make it sound like a real person telling an engaging story aloud: varied sentence lengths, conversational phrasing, natural transitions, emotional nuance, and punctuation that creates believable pauses. Avoid repetitive openings, generic AI phrases, excessive adjectives, and unnatural formal wording. Keep characters, costumes, setting and visual style consistent. Make each scene visually filmable and sequential.' },
           { role: 'user', content: `Create exactly ${count} sequential storyboard scenes for this ${durationSeconds}-second video. The overall concept is: ${prompt}. Return {"scenes":[{"title":"...","visual_prompt":"...","narration":"..."}]}.` }
         ]
       }),
