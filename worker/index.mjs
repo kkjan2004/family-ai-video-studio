@@ -154,6 +154,48 @@ async function generateClip({ baseUrl, apiKey, model, prompt, duration, aspectRa
   }
   return Buffer.from(await response.arrayBuffer())
 }
+async function planStoryboard({ baseUrl, apiKey, model, prompt, durationSeconds }) {
+  const count = Math.min(60, Math.max(1, Math.ceil(durationSeconds / 30)))
+  try {
+    const response = await fetch(baseUrl + '/chat/completions', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        model: model || 'auto',
+        temperature: 0.7,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: 'You are a film storyboard director. Return valid JSON only with a scenes array. Each scene must have title, visual_prompt, and narration. Keep characters, costumes, setting and visual style consistent. Make each scene visually filmable and sequential.' },
+          { role: 'user', content: `Create exactly ${count} sequential storyboard scenes for this ${durationSeconds}-second video. The overall concept is: ${prompt}. Return {"scenes":[{"title":"...","visual_prompt":"...","narration":"..."}]}.` }
+        ]
+      }),
+      signal: AbortSignal.timeout(90000)
+    })
+    if (!response.ok) throw new Error('Storyboard planner returned HTTP ' + response.status)
+    const payload = await response.json()
+    const content = payload.choices?.[0]?.message?.content
+    const parsed = JSON.parse(typeof content === 'string' ? content : JSON.stringify(content))
+    if (!Array.isArray(parsed.scenes) || !parsed.scenes.length) throw new Error('Storyboard response had no scenes')
+    return parsed.scenes.slice(0, count).map((scene, index) => ({
+      sort_order: index,
+      title: String(scene.title || `Scene ${index + 1}`).slice(0, 160),
+      visual_prompt: String(scene.visual_prompt || prompt).slice(0, 4000),
+      narration: String(scene.narration || '').slice(0, 2000),
+      duration_seconds: Math.min(120, Math.ceil(durationSeconds / count)),
+      style: 'AI storyboard'
+    }))
+  } catch (error) {
+    console.warn('Storyboard planning fallback:', error instanceof Error ? error.message : error)
+    return [{
+      sort_order: 0,
+      title: 'Main sequence',
+      visual_prompt: prompt,
+      narration: '',
+      duration_seconds: Math.min(120, durationSeconds),
+      style: 'Prompt fallback'
+    }]
+  }
+}
 async function processJob(job) {
   const workDir = await mkdtemp(join(tmpdir(), 'family-video-'))
   try {
@@ -170,6 +212,10 @@ async function processJob(job) {
       const { data: signed, error } = await supabase.storage.from('family-projects').createSignedUrl(imageAsset.storage_path, 86400)
       if (!error) imageUrl = signed?.signedUrl ?? null
     }
+    const storyboard = await planStoryboard({ baseUrl: connection.base_url, apiKey, model: connection.model, prompt: job.prompt, durationSeconds: job.target_duration_seconds })
+    await supabase.from('project_scenes').delete().eq('project_id', job.project_id)
+    const { error: sceneError } = await supabase.from('project_scenes').insert(storyboard)
+    if (sceneError) throw sceneError
     const clipSeconds = 6
     const clipCount = Math.ceil(job.target_duration_seconds / clipSeconds)
     const normalized = []
@@ -178,9 +224,11 @@ async function processJob(job) {
     await event(job.id, 'started', `Preparing ${clipCount} short clips.`, 2)
     for (let index = 0; index < clipCount; index++) {
       const seconds = Math.min(clipSeconds, job.target_duration_seconds - index * clipSeconds)
+      const scene = storyboard[Math.min(Math.floor(index / 5), storyboard.length - 1)]
       const scenePrompt = [
         job.prompt,
-        `Shot ${index + 1} of ${clipCount}. Create a coherent cinematic sequence with consistent characters, clothing, locations, lighting and visual style. This shot should progress naturally from the previous shot. No captions, no watermarks.`,
+        `Scene: ${scene.title}. ${scene.visual_prompt}`,
+        `Shot ${index + 1} of ${clipCount}. Continue this scene coherently, keeping characters, clothing, locations, lighting and visual style consistent. No captions, no watermarks.`,
         `Aspect ratio ${job.aspect_ratio}. Target quality ${job.quality_target} where supported.`
       ].join('\n\n')
       const rawPath = join(workDir, `raw-${String(index).padStart(4, '0')}.mp4`)
