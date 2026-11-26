@@ -52,7 +52,7 @@ function App() {
   const [duration, setDuration] = useState('600')
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [musicFile, setMusicFile] = useState<File | null>(null)
-  const [narrationEnabled, setNarrationEnabled] = useState(true)
+  const [narrationEnabled, setNarrationEnabled] = useState(false)
   const [narrationVoice, setNarrationVoice] = useState('alloy')
   const [gatewayUrl, setGatewayUrl] = useState('')
   const [gatewayKey, setGatewayKey] = useState('')
