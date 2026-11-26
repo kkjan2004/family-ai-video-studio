@@ -1,0 +1,8 @@
+{
+  "name": "family-ai-video-studio-worker",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": { "start": "node index.mjs" },
+  "dependencies": { "@supabase/supabase-js": "^2.49.1" }
+}
