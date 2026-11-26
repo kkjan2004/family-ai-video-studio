@@ -9,7 +9,7 @@ import { supabase } from './lib/supabase'
 
 type Section = 'Home' | 'Create video' | 'My projects' | 'Family space' | 'Settings'
 type Family = { id: string; name: string; created_at: string }
-type FamilyMember = { user_id: string; role: string; joined_at: string; profiles?: { display_name: string | null } | null }
+type FamilyMember = { user_id: string; role: string; joined_at: string }
 type Project = { id: string; family_id: string; title: string; description: string | null; status: string; visibility: string; created_at: string }
 type VideoJob = { id: string; project_id: string; mode: string; status: string; progress: number; prompt: string; quality_target: string; target_duration_seconds: number; created_at: string; error_message: string | null }
 
@@ -82,7 +82,7 @@ function App() {
       }
       setFamily(selectedFamily)
       const [memberResult, projectResult] = await Promise.all([
-        supabase.from('family_members').select('user_id,role,joined_at,profiles(display_name)').eq('family_id', selectedFamily.id).order('joined_at'),
+        supabase.from('family_members').select('user_id,role,joined_at').eq('family_id', selectedFamily.id).order('joined_at'),
         supabase.from('projects').select('id,family_id,title,description,status,visibility,created_at').eq('family_id', selectedFamily.id).order('created_at', { ascending: false })
       ])
       if (memberResult.error) throw memberResult.error
@@ -320,7 +320,7 @@ function App() {
         {!loading && section === 'Family space' && <div className="page-content inner-page"><div className="eyebrow"><Users size={14} /> FAMILY WORKSPACE</div><h1>Made for your <em>family.</em></h1><p className="page-lead">Manage your private family workspace, individual accounts and invitations.</p>
           {!family ? <div className="panel family-create"><div className="empty-icon"><Users size={25} /></div><h2>Create your family workspace</h2><p>Become the owner, then invite your family members using their own accounts.</p><label className="field-label" htmlFor="family-name">FAMILY WORKSPACE NAME</label><input id="family-name" value={familyName} onChange={event => setFamilyName(event.target.value)} maxLength={80} placeholder="My Family Workspace" /><button className="primary-button" disabled={busy || familyName.trim().length < 2} onClick={() => void createFamily()}>{busy ? 'Creating…' : 'Create private workspace'} <ChevronRight size={16} /></button></div> : <>
             <div className="panel family-summary"><div><span className="eyebrow">ACTIVE WORKSPACE</span><h2>{family.name}</h2><span>{members.length} members · Created {prettyDate(family.created_at)}</span></div><button className="icon-button" onClick={() => void loadWorkspace()} aria-label="Refresh family"><RefreshCw size={17} /></button></div>
-            <div className="panel feature-list member-list"><div className="section-heading"><div><span className="eyebrow">FAMILY MEMBERS</span><h2>People with access</h2></div><Users size={20} /></div>{members.map(member => <div key={member.user_id}><div className="member-avatar">{(member.profiles?.display_name?.[0] ?? 'F').toUpperCase()}</div><div><strong>{member.profiles?.display_name || (member.user_id === userId ? userEmail : 'Family member')}</strong><span>{member.role} · Joined {prettyDate(member.joined_at)}</span></div><span className="member-role">{member.role}</span></div>)}</div>
+            <div className="panel feature-list member-list"><div className="section-heading"><div><span className="eyebrow">FAMILY MEMBERS</span><h2>People with access</h2></div><Users size={20} /></div>{members.map(member => <div key={member.user_id}><div className="member-avatar">{(member.user_id[0] ?? 'F').toUpperCase()}</div><div><strong>{member.user_id === userId ? userEmail : 'Family member'}</strong><span>{member.role} · Joined {prettyDate(member.joined_at)}</span></div><span className="member-role">{member.role}</span></div>)}</div>
             {isAdmin && <div className="panel invite-panel"><div className="section-heading"><div><span className="eyebrow">OWNER CONTROLS</span><h2>Invite a family member</h2></div><UserPlus size={20} /></div><label className="field-label" htmlFor="invite-email">MEMBER EMAIL ADDRESS</label><input id="invite-email" type="email" value={inviteEmail} onChange={event => setInviteEmail(event.target.value)} placeholder="family.member@example.com" /><label className="field-label" htmlFor="invite-role">ACCESS ROLE</label><select id="invite-role" value={inviteRole} onChange={event => setInviteRole(event.target.value as 'member' | 'admin')}><option value="member">Member — create and manage own projects</option><option value="admin">Admin — manage family workspace</option></select><button className="primary-button" disabled={busy || !inviteEmail.includes('@')} onClick={() => void createInvitation()}>{busy ? 'Creating invitation…' : 'Create secure invitation'} <ChevronRight size={16} /></button>{inviteLink && <div className="invite-link"><span>{inviteLink}</span><button className="text-button" onClick={() => void navigator.clipboard?.writeText(inviteLink)}><Copy size={15} /> Copy link</button></div>}<p className="helper-text">Invitation links expire after 7 days and can only be accepted by the invited email address.</p></div>}
           </>}
         </div>}
