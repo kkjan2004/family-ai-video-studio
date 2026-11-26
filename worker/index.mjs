@@ -199,7 +199,9 @@ async function generateSpeech({ baseUrl, apiKey, text, voice, model }) {
     throw new Error('The speech endpoint did not return an audio file. Disable AI narration or check your gateway TTS support.')
   }
   const routedVia = response.headers.get('x-routed-via') || ''
-  const routedModel = routedVia.includes('/') ? routedVia.slice(routedVia.indexOf('/') + 1) : ''
+  let routedModel = routedVia.includes('/') ? routedVia.slice(routedVia.indexOf('/') + 1) : ''
+  // FreeLLMAPI percent-encodes non-ASCII model IDs in response headers.
+  try { routedModel = decodeURIComponent(routedModel) } catch { /* Keep the raw model ID if the header is malformed. */ }
   return { audio: Buffer.from(await response.arrayBuffer()), routedModel }
 }
 async function downloadPrivateAsset(storagePath, workDir, filename) {
