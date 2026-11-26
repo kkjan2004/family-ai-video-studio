@@ -91,3 +91,5 @@ h1 em{font-style:normal;color:#b8f36b}
 @media(max-width:760px){.app-alert{margin:10px 12px 0}.setup-strip{align-items:flex-start;flex-wrap:wrap}.setup-strip span{min-width:65%}.project-card{padding:12px;gap:10px}.project-icon{width:36px;height:36px}.invite-link{align-items:flex-start;flex-direction:column}.invite-link .text-button{align-self:flex-end}.member-role{font-size:8px!important}}
 
 .provider-panel{margin-top:14px}.provider-panel input{width:100%;display:block;margin:0 0 14px;border:1px solid #354637;border-radius:8px;background:#111a14;color:#edf3e8;padding:12px;font:inherit;font-size:12px;outline:none}.provider-panel input:focus{border-color:#8fbe65}.download-button{margin-top:9px}.download-button:hover{color:#d4ff9e}
+
+.progress-track{height:5px;width:100%;max-width:440px;margin-top:9px;background:#29362b;border-radius:10px;overflow:hidden}.progress-track span{display:block;height:100%;background:#b8f36b;border-radius:10px;transition:width .35s ease}
