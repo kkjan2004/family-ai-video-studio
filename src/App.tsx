@@ -54,6 +54,8 @@ function App() {
   const [musicFile, setMusicFile] = useState<File | null>(null)
   const [narrationEnabled, setNarrationEnabled] = useState(false)
   const [narrationVoice, setNarrationVoice] = useState('alloy')
+  const [narrationVolume, setNarrationVolume] = useState('100')
+  const [musicVolume, setMusicVolume] = useState('18')
   const [gatewayUrl, setGatewayUrl] = useState('')
   const [gatewayKey, setGatewayKey] = useState('')
   const [providerSaving, setProviderSaving] = useState(false)
@@ -250,7 +252,8 @@ function App() {
       const { data: job, error: jobError } = await supabase.from('video_jobs').insert({
         project_id: project.id, requested_by: userId, mode: modeKey[mode], prompt: prompt.trim(),
         target_duration_seconds: Number(duration), aspect_ratio: aspectRatio, quality_target: quality,
-        narration_enabled: narrationEnabled, narration_voice: narrationVoice, background_music_path: backgroundMusicPath
+        narration_enabled: narrationEnabled, narration_voice: narrationVoice, background_music_path: backgroundMusicPath,
+        narration_volume: Number(narrationVolume) / 100, music_volume: Number(musicVolume) / 100
       }).select('id').single()
       if (jobError) throw jobError
       setNotice('Video job saved to your private queue. AI generation will start when the secure rendering worker and provider credentials are configured.')
@@ -401,7 +404,9 @@ function App() {
               <label className="audio-toggle"><input type="checkbox" checked={narrationEnabled} onChange={event => setNarrationEnabled(event.target.checked)} /><span><strong>AI voice narration</strong><small>Generate spoken narration from your storyboard. Requires an audio/speech model on your FreeLLMAPI gateway.</small></span></label>
               {narrationEnabled && <div className="audio-field"><label className="field-label" htmlFor="narration-voice">NARRATION VOICE</label><select id="narration-voice" value={narrationVoice} onChange={event => setNarrationVoice(event.target.value)}><option value="alloy">Alloy</option><option value="nova">Nova</option><option value="echo">Echo</option><option value="onyx">Onyx</option><option value="shimmer">Shimmer</option></select></div>}
               <div className="upload-field audio-upload"><label className="field-label" htmlFor="background-music">BACKGROUND MUSIC (OPTIONAL)</label><label className="upload-drop" htmlFor="background-music"><UploadCloud size={20} /><span>{musicFile ? musicFile.name : 'Choose MP3, WAV, M4A or OGG from your phone'}</span><small>Max 50 MB</small></label><input id="background-music" type="file" accept="audio/mpeg,audio/mp4,audio/wav,audio/x-wav,audio/aac,audio/ogg,.mp3,.m4a,.wav,.aac,.ogg" onChange={event => setMusicFile(event.target.files?.[0] ?? null)} /></div>
-              <p className="helper-text">Narration and music are mixed into the final MP4. Music is automatically looped or trimmed to the video length and lowered under narration.</p>
+              {narrationEnabled && <div className="audio-volume"><label htmlFor="narration-volume">VOICE VOLUME <strong>{narrationVolume}%</strong></label><input id="narration-volume" type="range" min="0" max="150" step="5" value={narrationVolume} onChange={event => setNarrationVolume(event.target.value)} /></div>}
+              {musicFile && <div className="audio-volume"><label htmlFor="music-volume">MUSIC VOLUME <strong>{musicVolume}%</strong></label><input id="music-volume" type="range" min="0" max="100" step="5" value={musicVolume} onChange={event => setMusicVolume(event.target.value)} /></div>}
+              <p className="helper-text">Narration and music are mixed into the final MP4. Music is automatically looped or trimmed to the video length and lowered under narration. If both options are off, the video will be silent.</p>
             </div>
             <div className="creator-options">
               <div><label className="field-label" htmlFor="quality">VIDEO QUALITY</label><select id="quality" value={quality} onChange={event => setQuality(event.target.value)}><option value="1080p">1080p target</option><option value="720p">720p target</option></select><small>Provider support determines native or upscaled output.</small></div>
