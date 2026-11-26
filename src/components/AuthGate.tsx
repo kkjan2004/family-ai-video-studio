@@ -1,10 +1,11 @@
-import { FormEvent, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
+import type { FormEvent, ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { LockKeyhole, Mail, ShieldCheck, Sparkles } from 'lucide-react'
 import { supabase, supabaseConfigured } from '../lib/supabase'
 import './auth.css'
 
-type Props = { children: React.ReactNode }
+type Props = { children: ReactNode }
 
 export default function AuthGate({ children }: Props) {
   const [session, setSession] = useState<Session | null>(null)
