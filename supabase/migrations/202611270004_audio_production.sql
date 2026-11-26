@@ -1,6 +1,6 @@
 -- Optional audio production settings for each queued video job.
 alter table public.video_jobs
-  add column if not exists narration_enabled boolean not null default true,
+  add column if not exists narration_enabled boolean not null default false,
   add column if not exists narration_voice text not null default 'alloy',
   add column if not exists background_music_path text;
 
