@@ -47,6 +47,8 @@ The repository includes `vercel.json` for a Vite single-page app. Import the pri
 
 Redeploy after changing environment variables. Then add the Vercel deployment URL to Supabase Authentication → URL Configuration and set it as the Site URL.
 
+The worker also provides an authenticated provider-connection status endpoint; the app checks it when Settings opens and never reads or displays stored API keys. Job polling uses a stable 10-second timer while work is active.
+
 ## 3. Deploy the rendering worker
 
 Deploy the `worker/` folder as a Docker web service on a host that supports a long-running process and FFmpeg. GitHub Pages and Supabase Edge Functions are not suitable for the long-running FFmpeg worker.
