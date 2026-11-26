@@ -8,6 +8,7 @@ This is a private server-side worker. It is not part of the browser bundle.
 - Claims queued jobs atomically from Supabase.
 - Calls the FreeLLMAPI video endpoint for short clips, normalizes them with FFmpeg, stitches them, and stores the MP4 in the private Supabase Storage bucket.
 - Updates job progress and events. Each job uses the provider connection belonging to the member who requested it.
+- Maintains a 10-minute database lease while rendering. If the process crashes, an expired job is reclaimed from the beginning, with a maximum of three worker claims.
 
 ## Deploy
 Deploy this folder as a Docker web service on a host that supports long-running processes and FFmpeg. Set the variables in `.env.example`. Use a persistent worker process; do not deploy as a short-lived serverless function.
@@ -21,7 +22,7 @@ Every family member must connect their own permitted FreeLLMAPI account / gatewa
 - Uses 6-second generation requests as provider-compatible clip units.
 - Assembles longer projects from those clips; provider support, quota and speed determine completion time.
 - The final clips are normalized to 1080-sized frames and 30 fps. This is an output target, not a promise of native 1080p source quality.
-- Audio mixing, narration tracks, advanced scene editing, and automatic recovery of partially completed clip batches are future enhancements.
+- Audio mixing, narration tracks, and advanced scene editing remain future enhancements. Recovery restarts an interrupted job from the beginning; it does not resume individual clips.
 - Provider calls can take up to five minutes per clip. Monitor provider limits before queueing long videos.
 
 ## Security
