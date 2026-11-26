@@ -48,6 +48,24 @@ alter table public.families enable row level security;
 alter table public.family_members enable row level security;
 alter table public.projects enable row level security;
 
+-- SECURITY DEFINER membership check avoids recursive RLS evaluation on family_members.
+create or replace function public.is_family_member(target_family_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $
+  select exists (
+    select 1 from public.family_members fm
+    where fm.family_id = target_family_id
+      and fm.user_id = (select auth.uid())
+  );
+$;
+revoke all on function public.is_family_member(uuid) from public;
+grant execute on function public.is_family_member(uuid) to authenticated;
+
+
 -- Profiles: a user can read and edit only their own profile.
 drop policy if exists "profiles_select_self" on public.profiles;
 create policy "profiles_select_self" on public.profiles
@@ -64,23 +82,20 @@ create policy "profiles_update_self" on public.profiles
 drop policy if exists "families_select_members" on public.families;
 create policy "families_select_members" on public.families
   for select to authenticated using (
-    exists (select 1 from public.family_members fm
-      where fm.family_id = families.id and fm.user_id = (select auth.uid()))
+    public.is_family_member(families.id)
   );
 
 drop policy if exists "family_members_select_same_family" on public.family_members;
 create policy "family_members_select_same_family" on public.family_members
   for select to authenticated using (
-    exists (select 1 from public.family_members mine
-      where mine.family_id = family_members.family_id and mine.user_id = (select auth.uid()))
+    public.is_family_member(family_members.family_id)
   );
 
 -- Projects are visible only to members of their family.
 drop policy if exists "projects_select_family_members" on public.projects;
 create policy "projects_select_family_members" on public.projects
   for select to authenticated using (
-    exists (select 1 from public.family_members fm
-      where fm.family_id = projects.family_id and fm.user_id = (select auth.uid()))
+    public.is_family_member(projects.family_id)
   );
 
 -- Project creation is allowed only for a current family member, and creator must be self.
