@@ -87,6 +87,20 @@ const server = http.createServer(async (req, res) => {
   cors(req, res)
   if (req.method === 'OPTIONS') { res.writeHead(204); return res.end() }
   if (req.method === 'GET' && req.url === '/health') return send(res, 200, { ok: true, service: 'family-video-worker' })
+  if (req.method === 'GET' && req.url === '/api/provider-connection') {
+    try {
+      const user = await authenticate(req)
+      const { data, error } = await supabase.from('provider_connections')
+        .select('is_enabled')
+        .eq('user_id', user.id)
+        .eq('provider', 'freellmapi')
+        .maybeSingle()
+      if (error) throw error
+      return send(res, 200, { ok: true, configured: Boolean(data?.is_enabled) })
+    } catch (error) {
+      return send(res, 401, { error: error instanceof Error ? error.message : 'Could not read provider status.' })
+    }
+  }
   if (req.method === 'POST' && req.url === '/api/provider-connection') {
     try {
       const user = await authenticate(req)
