@@ -90,7 +90,7 @@ Fill only the public frontend values in `.env.local`. Never commit real environm
 - The worker currently generates 6-second clips, normalizes them with FFmpeg, and stitches them into MP4.
 - Longer videos require many provider requests; completion time and availability depend on each member's provider quota and provider support.
 - The worker targets 1080-sized frames, but this does not guarantee native 1080p source quality.
-- Current worker output is silent (no narration/music mixing yet). Advanced storyboard editing, audio tracks, retries/resume and richer job controls remain future enhancements.
+- Current worker output is silent (no narration/music mixing yet). Advanced storyboard editing, audio tracks and richer job controls remain future enhancements. If a worker process stops unexpectedly, a 10-minute lease expires and the job is automatically retried from the beginning, up to three worker claims.
 - The private Supabase Storage bucket is set to 50 MB per object to fit the current Free-plan global file limit. Long 1080p videos may exceed this cap; the worker compresses output and rejects files above 50 MB. Larger files require a higher Supabase plan or a separate object-storage service.
 
 ## Security
