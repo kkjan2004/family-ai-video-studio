@@ -1,4 +1,4 @@
-name: Frontend build
+name: Build and validate app
 
 on:
   push:
@@ -7,7 +7,8 @@ on:
     branches: [main]
 
 jobs:
-  build:
+  frontend:
+    name: Frontend production build
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -16,12 +17,39 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Install dependencies
+          cache: npm
+      - name: Install frontend dependencies
         run: npm install
-      - name: Build frontend
+      - name: Type-check and build PWA
         run: npm run build
 
+  worker:
+    name: Worker syntax and dependency validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
       - name: Validate worker JavaScript syntax
         run: node --check worker/index.mjs
       - name: Install worker dependencies
         run: npm --prefix worker install --ignore-scripts
+
+  worker-docker:
+    name: Build FFmpeg worker Docker image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build worker image (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: ./worker
+          file: ./worker/Dockerfile
+          push: false
+          tags: family-ai-video-studio-worker:ci
