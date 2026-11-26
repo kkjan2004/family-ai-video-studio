@@ -67,6 +67,7 @@ create table if not exists public.video_job_events (
   created_at timestamptz not null default now()
 );
 
+create unique index if not exists family_members_one_workspace_per_user_idx on public.family_members(user_id);
 create index if not exists family_invitations_family_idx on public.family_invitations(family_id, created_at desc);
 create index if not exists project_scenes_project_idx on public.project_scenes(project_id, sort_order);
 create index if not exists project_assets_project_idx on public.project_assets(project_id, created_at desc);
