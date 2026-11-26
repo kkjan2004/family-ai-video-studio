@@ -95,3 +95,5 @@ h1 em{font-style:normal;color:#b8f36b}
 .progress-track{height:5px;width:100%;max-width:440px;margin-top:9px;background:#29362b;border-radius:10px;overflow:hidden}.progress-track span{display:block;height:100%;background:#b8f36b;border-radius:10px;transition:width .35s ease}
 
 .status-pill{display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;padding:5px 9px;border:1px solid #465443;border-radius:20px;color:#c6d3bf;font-size:9px;font-weight:800;letter-spacing:.08em}.status-pill.success{border-color:#547b3d;background:#1d321b;color:#c6f58d}.status-pill.pending{border-color:#665a35;background:#302a1b;color:#e6d28c}
+
+.settings-list .connected{color:#c6f58d}
