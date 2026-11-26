@@ -273,3 +273,38 @@ for delete to authenticated using (
 -- This schema intentionally queues jobs but does not fake AI rendering.
 -- A trusted server worker must claim jobs, call authorized providers, stitch clips with FFmpeg,
 -- and update progress/output using server-only credentials.
+
+-- Each member connects their own permitted provider account. Secrets are encrypted by the trusted worker.
+create table if not exists public.provider_connections (
+  user_id uuid not null references auth.users(id) on delete cascade,
+  provider text not null check (provider in ('freellmapi')),
+  base_url text not null,
+  model text not null default 'auto',
+  encrypted_api_key text not null,
+  is_enabled boolean not null default true,
+  updated_at timestamptz not null default now(),
+  primary key (user_id, provider)
+);
+alter table public.provider_connections enable row level security;
+-- No browser policies: only the trusted worker's service-role connection may read/write credentials.
+
+-- Atomically claim one queued job so multiple worker instances do not process the same job.
+create or replace function public.claim_next_video_job()
+returns setof public.video_jobs
+language sql
+security definer
+set search_path = ''
+as $$
+  update public.video_jobs
+  set status = 'planning', progress = 1, started_at = now(), error_message = null
+  where id = (
+    select id from public.video_jobs
+    where status = 'queued'
+    order by created_at
+    for update skip locked
+    limit 1
+  )
+  returning *;
+$$;
+revoke all on function public.claim_next_video_job() from public, anon, authenticated;
+grant execute on function public.claim_next_video_job() to service_role;
