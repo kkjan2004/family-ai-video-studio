@@ -176,6 +176,34 @@ async function generateClip({ baseUrl, apiKey, model, prompt, duration, aspectRa
   }
   return Buffer.from(await response.arrayBuffer())
 }
+async function generateSpeech({ baseUrl, apiKey, text, voice }) {
+  const response = await fetch(baseUrl + '/audio/speech', {
+    method: 'POST',
+    headers: { authorization: 'Bearer ' + apiKey, 'content-type': 'application/json' },
+    body: JSON.stringify({ model: process.env.TTS_MODEL || 'tts-1', input: text, voice: voice || 'alloy', response_format: 'mp3' }),
+    signal: AbortSignal.timeout(120000)
+  })
+  if (!response.ok) {
+    const detail = (await response.text()).slice(0, 1000)
+    throw new Error('AI narration is not available from this gateway (HTTP ' + response.status + '). Disable AI narration or configure a compatible speech model. ' + detail)
+  }
+  const contentType = response.headers.get('content-type') || ''
+  if (!contentType.includes('audio') && !contentType.includes('octet-stream')) {
+    throw new Error('The speech endpoint did not return an audio file. Disable AI narration or check your gateway TTS support.')
+  }
+  return Buffer.from(await response.arrayBuffer())
+}
+async function downloadPrivateAsset(storagePath, workDir, filename) {
+  const { data, error } = await supabase.storage.from('family-projects').createSignedUrl(storagePath, 600)
+  if (error || !data?.signedUrl) throw new Error('Could not create a private audio download link.')
+  const response = await fetch(data.signedUrl, { signal: AbortSignal.timeout(60000) })
+  if (!response.ok) throw new Error('Could not download the private background music file.')
+  const buffer = Buffer.from(await response.arrayBuffer())
+  if (buffer.length > 50 * 1024 * 1024) throw new Error('Background music exceeds the 50 MB file limit.')
+  const path = join(workDir, filename)
+  await writeFile(path, buffer)
+  return path
+}
 async function planStoryboard({ baseUrl, apiKey, model, prompt, durationSeconds }) {
   const count = Math.min(60, Math.max(1, Math.ceil(durationSeconds / 30)))
   try {
@@ -248,6 +276,30 @@ async function processJob(job) {
     const clipSeconds = 6
     const clipCount = Math.ceil(job.target_duration_seconds / clipSeconds)
     const normalized = []
+    const narrationSegments = []
+    if (job.narration_enabled) {
+      await event(job.id, 'audio_planning', 'Preparing AI voice narration for the storyboard.', 2)
+      for (let index = 0; index < storyboard.length; index++) {
+        const scene = storyboard[index]
+        const sceneDuration = index === storyboard.length - 1
+          ? Math.max(1, job.target_duration_seconds - storyboard.slice(0, index).reduce((sum, item) => sum + item.duration_seconds, 0))
+          : Math.min(scene.duration_seconds, Math.max(1, job.target_duration_seconds - storyboard.slice(0, index).reduce((sum, item) => sum + item.duration_seconds, 0)))
+        const audioPath = join(workDir, 'narration-' + String(index).padStart(3, '0') + '.wav')
+        if (scene.narration.trim()) {
+          const speech = await generateSpeech({ baseUrl: connection.base_url, apiKey, text: scene.narration, voice: job.narration_voice })
+          const speechPath = join(workDir, 'speech-' + String(index).padStart(3, '0') + '.mp3')
+          await writeFile(speechPath, speech)
+          await run('ffmpeg', ['-y','-i',speechPath,'-af',`apad,atrim=0:${sceneDuration},asetpts=N/SR/TB`,'-ar','44100','-ac','2','-c:a','pcm_s16le',audioPath])
+        } else {
+          await run('ffmpeg', ['-y','-f','lavfi','-i','anullsrc=r=44100:cl=stereo','-t',String(sceneDuration),'-c:a','pcm_s16le',audioPath])
+        }
+        narrationSegments.push(audioPath)
+      }
+    }
+    let backgroundMusicPath = null
+    if (job.background_music_path) {
+      backgroundMusicPath = await downloadPrivateAsset(job.background_music_path, workDir, 'background-music')
+    }
     await supabase.from('projects').update({ status: 'processing' }).eq('id', project.id)
     await updateJob(job.id, { status: 'generating', progress: 2, provider: 'freellmapi' })
     await event(job.id, 'started', `Preparing ${clipCount} short clips.`, 2)
@@ -283,10 +335,31 @@ async function processJob(job) {
     await event(job.id, 'rendering', 'Combining generated clips into the final MP4.', 92)
     const concatPath = join(workDir, 'clips.txt')
     await writeFile(concatPath, normalized.map(path => `file '${path.replace(/'/g, "'\\''")}'`).join('\n'))
+    const silentPath = join(workDir, 'silent.mp4')
     const outputPath = join(workDir, 'final.mp4')
-    const targetBitrate = Math.max(160000, Math.floor((48 * 1024 * 1024 * 8 * 0.9) / job.target_duration_seconds))
-    await run('ffmpeg', ['-y','-f','concat','-safe','0','-i',concatPath,'-c:v','libx264','-preset','veryfast','-b:v',String(targetBitrate),'-maxrate',String(targetBitrate),'-bufsize',String(targetBitrate * 2),'-pix_fmt','yuv420p','-an','-movflags','+faststart',outputPath])
-    const output = await readFile(outputPath)
+    const targetBitrate = Math.max(160000, Math.floor((47 * 1024 * 1024 * 8 * 0.9) / job.target_duration_seconds))
+    await run('ffmpeg', ['-y','-f','concat','-safe','0','-i',concatPath,'-c:v','libx264','-preset','veryfast','-b:v',String(targetBitrate),'-maxrate',String(targetBitrate),'-bufsize',String(targetBitrate * 2),'-pix_fmt','yuv420p','-an','-movflags','+faststart',silentPath])
+    let finalPath = silentPath
+    if (narrationSegments.length) {
+      const narrationList = join(workDir, 'narration.txt')
+      await writeFile(narrationList, narrationSegments.map(path => `file '${path.replace(/'/g, "'\\\\''")}'`).join('\\n'))
+      const narrationPath = join(workDir, 'narration.wav')
+      await run('ffmpeg', ['-y','-f','concat','-safe','0','-i',narrationList,'-ar','44100','-ac','2','-c:a','pcm_s16le',narrationPath])
+      const args = ['-y','-i',silentPath,'-i',narrationPath]
+      if (backgroundMusicPath) args.push('-stream_loop','-1','-i',backgroundMusicPath)
+      if (backgroundMusicPath) {
+        args.push('-filter_complex','[1:a]volume=1.0[narr];[2:a]volume=0.18[music];[narr][music]amix=inputs=2:duration=first:dropout_transition=2[aout]','-map','0:v:0','-map','[aout]')
+      } else {
+        args.push('-filter_complex','[1:a]volume=1.0[aout]','-map','0:v:0','-map','[aout]')
+      }
+      args.push('-c:v','copy','-c:a','aac','-b:a','128k','-t',String(job.target_duration_seconds),'-movflags','+faststart',outputPath)
+      await run('ffmpeg', args)
+      finalPath = outputPath
+    } else if (backgroundMusicPath) {
+      await run('ffmpeg', ['-y','-i',silentPath,'-stream_loop','-1','-i',backgroundMusicPath,'-filter_complex','[1:a]volume=0.22[aout]','-map','0:v:0','-map','[aout]','-c:v','copy','-c:a','aac','-b:a','128k','-t',String(job.target_duration_seconds),'-movflags','+faststart',outputPath])
+      finalPath = outputPath
+    }
+    const output = await readFile(finalPath)
     if (output.length > 50 * 1024 * 1024) throw new Error('Final MP4 exceeds the current 50 MB storage limit. Use a shorter video or upgrade storage before rendering longer videos.')
     const storagePath = `${project.family_id}/${project.id}/renders/${job.id}.mp4`
     const { error: uploadError } = await supabase.storage.from('family-projects').upload(storagePath, output, { contentType: 'video/mp4', upsert: true })
