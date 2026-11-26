@@ -95,7 +95,7 @@ Fill only the public frontend values in `.env.local`. Never commit real environm
 - The worker currently generates 6-second clips, normalizes them with FFmpeg, and stitches them into MP4.
 - Longer videos require many provider requests; completion time and availability depend on each member's provider quota and provider support.
 - The worker targets 1080-sized frames, but this does not guarantee native 1080p source quality.
-- Current worker output is silent (no narration/music mixing yet). Advanced storyboard editing, audio tracks and richer job controls remain future enhancements. If a worker process stops unexpectedly, a 10-minute lease expires and the job is automatically retried from the beginning, up to three worker claims.
+- Optional AI narration and uploaded background music are supported. Narration is generated scene-by-scene through the member's compatible `/audio/speech` gateway, then mixed with music using FFmpeg. Voice and music levels are configurable. Natural-delivery instructions are sent where supported; providers that reject optional prosody fields receive one portable-format retry. When the gateway reports its routed speech model, later scenes are pinned to that model where supported. Actual voice quality, Telugu pronunciation and voice consistency still require a real provider audio test. If a worker process stops unexpectedly, a 10-minute lease expires and the job is automatically retried from the beginning, up to three worker claims.
 - The private Supabase Storage bucket is set to 50 MB per object to fit the current Free-plan global file limit. Long 1080p videos may exceed this cap; the worker compresses output and rejects files above 50 MB. Larger files require a higher Supabase plan or a separate object-storage service.
 
 ## Security
@@ -108,4 +108,4 @@ Fill only the public frontend values in `.env.local`. Never commit real environm
 
 ## CI
 
-GitHub Actions runs the TypeScript/Vite production build and checks worker JavaScript syntax.
+GitHub Actions runs the TypeScript/Vite production build, checks worker JavaScript syntax, and installs worker dependencies. A passing CI run validates code/build checks only; it does not apply Supabase migrations, deploy the PWA or worker, or prove a live provider TTS/video request.
