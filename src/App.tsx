@@ -113,6 +113,22 @@ function App() {
   }, [loadWorkspace])
 
   useEffect(() => {
+    const client = supabase
+    const active = jobs.some(job => ['queued','planning','generating','rendering'].includes(job.status))
+    if (!client || !active || !projects.length) return
+    const projectIds = projects.map(project => project.id)
+    const timer = window.setInterval(async () => {
+      const [jobResult, projectResult] = await Promise.all([
+        client.from('video_jobs').select('id,project_id,mode,status,progress,prompt,quality_target,target_duration_seconds,created_at,error_message,output_asset_id').in('project_id', projectIds).order('created_at', { ascending: false }),
+        client.from('projects').select('id,family_id,title,description,status,visibility,created_at').eq('family_id', family?.id ?? '').order('created_at', { ascending: false })
+      ])
+      if (!jobResult.error && jobResult.data) setJobs(jobResult.data as VideoJob[])
+      if (!projectResult.error && projectResult.data) setProjects(projectResult.data as Project[])
+    }, 10000)
+    return () => window.clearInterval(timer)
+  }, [jobs, projects, family?.id])
+
+  useEffect(() => {
     const token = new URLSearchParams(window.location.search).get('invite')
     const client = supabase
     if (!token || !client) return
@@ -346,7 +362,7 @@ function App() {
           <div className="project-list">{projects.length ? projects.map(project => {
             const projectJobs = jobs.filter(job => job.project_id === project.id)
             const latestJob = projectJobs[0]
-            return <article className="project-card" key={project.id}><div className="project-icon"><Film size={22} /></div><div className="project-main"><strong>{project.title}</strong><span>{project.visibility === 'family' ? 'Family shared' : 'Private'} · {prettyDate(project.created_at)}</span>{latestJob && <div className="job-line"><span className={`job-status status-${latestJob.status}`}>{statusLabel(latestJob.status)}</span><span>{latestJob.progress}% · {latestJob.quality_target} · {Math.round(latestJob.target_duration_seconds / 60)} min</span></div>}{latestJob?.error_message && <small className="job-error">{latestJob.error_message}</small>}{latestJob?.status === 'completed' && <button className="text-button download-button" onClick={() => void downloadJob(latestJob)}><Film size={14} /> Download MP4</button>}</div><button className="icon-button delete-project" onClick={() => void deleteProject(project.id)} aria-label="Delete project"><X size={17} /></button></article>
+            return <article className="project-card" key={project.id}><div className="project-icon"><Film size={22} /></div><div className="project-main"><strong>{project.title}</strong><span>{project.visibility === 'family' ? 'Family shared' : 'Private'} · {prettyDate(project.created_at)}</span>{latestJob && <div className="job-line"><span className={`job-status status-${latestJob.status}`}>{statusLabel(latestJob.status)}</span><span>{latestJob.progress}% · {latestJob.quality_target} · {Math.round(latestJob.target_duration_seconds / 60)} min</span></div>}{latestJob && <div className="progress-track"><span style={{ width: `${latestJob.progress}%` }} /></div>}{latestJob?.error_message && <small className="job-error">{latestJob.error_message}</small>}{latestJob?.status === 'completed' && <button className="text-button download-button" onClick={() => void downloadJob(latestJob)}><Film size={14} /> Download MP4</button>}</div><button className="icon-button delete-project" onClick={() => void deleteProject(project.id)} aria-label="Delete project"><X size={17} /></button></article>
           }) : <div className="panel empty-large"><div className="empty-icon"><Film size={28} /></div><h2>No projects yet</h2><p>Start a video and your saved projects will appear here.</p><button className="primary-button" onClick={() => openCreator()}><Plus size={17} /> Create your first video</button></div>}</div>
         </div>}
 
