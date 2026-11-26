@@ -235,6 +235,7 @@ function App() {
       }
       let backgroundMusicPath: string | null = null
       if (musicFile) {
+        if (!musicFile.type.startsWith('audio/') && !/\\.(mp3|m4a|wav|aac|ogg)$/i.test(musicFile.name)) throw new Error('Choose a supported audio file (MP3, M4A, WAV, AAC or OGG).')
         if (musicFile.size > 50 * 1024 * 1024) throw new Error('Background music must be smaller than 50 MB on the current storage plan.')
         const safeName = musicFile.name.replace(/[^a-zA-Z0-9._-]/g, '_')
         backgroundMusicPath = activeFamily.id + '/' + project.id + '/' + crypto.randomUUID() + '-' + safeName
