@@ -41,7 +41,7 @@ function isPrivateAddress(address) {
       || (a === 198 && (b === 18 || b === 19))
   }
   const value = address.toLowerCase()
-  return value === '::' || value === '::1' || value.startsWith('fc') || value.startsWith('fd')
+  return value === '::' || value === '::1' || value.startsWith('::ffff:') || value.startsWith('fc') || value.startsWith('fd')
     || value.startsWith('fe80:') || value.startsWith('ff')
 }
 async function validatePublicGateway(url) {
@@ -93,6 +93,7 @@ const server = http.createServer(async (req, res) => {
       const body = await readJson(req)
       const base = new URL(String(body.baseUrl || ''))
       await validatePublicGateway(base)
+      if (base.username || base.password || base.search || base.hash) throw new Error('Gateway URL cannot contain credentials, query parameters or fragments.')
       if (!String(body.apiKey || '').trim() || String(body.apiKey).length > 4096) throw new Error('Enter a valid API key.')
       const baseUrl = base.toString().replace(/\/$/, '')
       if (!baseUrl.endsWith('/v1')) throw new Error('Base URL must end with /v1 (example: https://your-host/v1).')
