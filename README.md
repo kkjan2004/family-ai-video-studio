@@ -29,7 +29,9 @@ A successful frontend build does not mean the cloud services are already configu
 
 ### Apply database migrations
 
-Run these files in order in Supabase **SQL Editor**:
+**Mobile-friendly one-file option:** open [`supabase/SETUP_ALL.sql`](supabase/SETUP_ALL.sql), copy the entire file, paste it into Supabase **SQL Editor → New query**, and run it once. This combines migrations 001–005 in order. Do not run the combined script if you have already applied any of those migrations; in that case, continue only with the unapplied individual files below.
+
+Or run these files individually in order in Supabase **SQL Editor**:
 
 1. `supabase/migrations/202611270001_initial_family_schema.sql`
 2. `supabase/migrations/202611270002_video_pipeline_and_family_invites.sql`
