@@ -59,7 +59,7 @@ The worker also provides an authenticated provider-connection status endpoint; t
 
 ## 3. Deploy the rendering worker
 
-Deploy the `worker/` folder as a Docker web service on a host that supports a long-running process and FFmpeg. GitHub Pages and Supabase Edge Functions are not suitable for the long-running FFmpeg worker.
+Deploy the repository as a Docker web service on a host that supports a long-running process and FFmpeg. Set Dockerfile Path to `worker/Dockerfile` and Build Context to the repository root because the Dockerfile copies from `worker/`. GitHub Pages and Supabase Edge Functions are not suitable for the long-running FFmpeg worker.
 
 Set the worker environment variables from `worker/.env.example`:
 
