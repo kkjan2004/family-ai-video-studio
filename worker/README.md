@@ -12,7 +12,7 @@ This is a private server-side worker. It is not part of the browser bundle.
 - Maintains a 10-minute database lease while rendering. If the process crashes, an expired job is reclaimed from the beginning, with a maximum of three worker claims.
 
 ## Deploy
-Deploy this folder as a Docker web service on a host that supports long-running processes and FFmpeg. Set the variables in `.env.example`. Use a persistent worker process; do not deploy as a short-lived serverless function.
+Deploy the repository as a Docker web service on a host that supports long-running processes and FFmpeg. Set the Dockerfile path to `worker/Dockerfile` and the build context to the repository root (not the `worker` subfolder), because the Dockerfile copies files from `worker/`. Set the variables in `worker/.env.example`. Use a persistent worker process; do not deploy as a short-lived serverless function.
 
 The frontend must be configured with `VITE_WORKER_API_URL=https://YOUR_WORKER_HOST`. Configure `APP_ORIGIN` to the exact frontend origin.
 
