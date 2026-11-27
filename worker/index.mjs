@@ -7,6 +7,10 @@ import { spawn } from 'node:child_process'
 import { lookup } from 'node:dns/promises'
 import { isIP } from 'node:net'
 import { createClient } from '@supabase/supabase-js'
+import WebSocket from 'ws'
+
+// Provide WebSocket in Node.js 20 for Supabase Realtime compatibility.
+globalThis.WebSocket ??= WebSocket
 
 const required = ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'PROVIDER_CREDENTIALS_ENCRYPTION_KEY']
 for (const name of required) if (!process.env[name]) throw new Error(`Missing environment variable: ${name}`)
