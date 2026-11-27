@@ -64,13 +64,15 @@ export default function AuthGate({ children }: Props) {
     } catch (err) {
       const detail = err && typeof err === 'object' ? err as Record<string, unknown> : {}
       console.error('Authentication diagnostic:', detail)
+      const requestPath = mode === 'signup' ? '/auth/v1/signup' : '/auth/v1/token?grant_type=password'
+      console.error('Auth request diagnostic:', { operation: mode, requestUrl: supabaseUrl ? `${supabaseUrl}${requestPath}` : 'Supabase URL missing', error: err })
       const parts = [
         typeof detail.message === 'string' ? detail.message : err instanceof Error ? err.message : 'Authentication failed',
         typeof detail.code === 'string' ? `Code: ${detail.code}` : '',
         typeof detail.status === 'number' ? `HTTP: ${detail.status}` : '',
         typeof detail.details === 'string' ? `Details: ${detail.details}` : '',
         typeof detail.hint === 'string' ? `Hint: ${detail.hint}` : '',
-        supabaseUrl ? `Auth endpoint: ${supabaseUrl}/auth/v1/signup` : 'Supabase project URL is invalid'
+        supabaseUrl ? `WHERE: Supabase Auth (${mode}) | REQUEST: ${supabaseUrl}${requestPath}` : 'WHERE: Supabase client setup | Supabase project URL is invalid'
       ].filter(Boolean)
       setError(parts.join(' | '))
     } finally {
