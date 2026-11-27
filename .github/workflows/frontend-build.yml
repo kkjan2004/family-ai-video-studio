@@ -48,7 +48,7 @@ jobs:
       - name: Build worker image (no push)
         uses: docker/build-push-action@v6
         with:
-          context: ./worker
+          context: .
           file: ./worker/Dockerfile
           push: false
           tags: family-ai-video-studio-worker:ci
