@@ -31,7 +31,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - name: Validate worker JavaScript syntax
         run: node --check worker/index.mjs
       - name: Install worker dependencies
