@@ -7,16 +7,14 @@ function normalizeProjectUrl(value: string | undefined): string | null {
   if (!value) return null
   try {
     const parsed = new URL(value)
-    if (parsed.protocol !== 'https:' && parsed.hostname !== 'localhost') return null
+    const isSupabaseProjectHost = parsed.hostname.endsWith('.supabase.co')
+    const isLocalhost = parsed.hostname === 'localhost'
+    if (parsed.protocol !== 'https:' && !isLocalhost) return null
+    if (!isSupabaseProjectHost && !isLocalhost) return null
     if (parsed.search || parsed.hash || parsed.username || parsed.password) return null
-    const path = parsed.pathname.replace(/\/+$/, '')
-    // Accept a mistakenly copied REST/Auth endpoint, but always initialize
-    // Supabase from the project root so Auth requests go to /auth/v1/*.
-    if (path === '' || path === '/rest/v1' || path === '/auth/v1') {
-      parsed.pathname = ''
-      return parsed.origin
-    }
-    return null
+    // Only the project origin belongs here. Remove accidental /rest/v1 or
+    // /auth/v1 suffixes so SDK endpoints are always built from the root.
+    return parsed.origin
   } catch {
     return null
   }
