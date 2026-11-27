@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { LockKeyhole, Mail, ShieldCheck, Sparkles } from 'lucide-react'
-import { supabase, supabaseConfigured } from '../lib/supabase'
+import { supabase, supabaseConfigured, supabaseUrl } from '../lib/supabase'
 import './auth.css'
 
 type Props = { children: ReactNode }
@@ -57,7 +57,8 @@ export default function AuthGate({ children }: Props) {
         typeof detail.code === 'string' ? `Code: ${detail.code}` : '',
         typeof detail.status === 'number' ? `HTTP: ${detail.status}` : '',
         typeof detail.details === 'string' ? `Details: ${detail.details}` : '',
-        typeof detail.hint === 'string' ? `Hint: ${detail.hint}` : ''
+        typeof detail.hint === 'string' ? `Hint: ${detail.hint}` : '',
+        supabaseUrl ? `Auth endpoint: ${supabaseUrl}/auth/v1/signup` : 'Supabase project URL is invalid'
       ].filter(Boolean)
       setError(parts.join(' | '))
     } finally {
