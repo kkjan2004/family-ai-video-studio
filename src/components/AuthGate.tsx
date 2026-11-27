@@ -50,7 +50,16 @@ export default function AuthGate({ children }: Props) {
         if (authError) throw authError
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Authentication failed. Please try again.')
+      const detail = err && typeof err === 'object' ? err as Record<string, unknown> : {}
+      console.error('Authentication diagnostic:', detail)
+      const parts = [
+        typeof detail.message === 'string' ? detail.message : err instanceof Error ? err.message : 'Authentication failed',
+        typeof detail.code === 'string' ? `Code: ${detail.code}` : '',
+        typeof detail.status === 'number' ? `HTTP: ${detail.status}` : '',
+        typeof detail.details === 'string' ? `Details: ${detail.details}` : '',
+        typeof detail.hint === 'string' ? `Hint: ${detail.hint}` : ''
+      ].filter(Boolean)
+      setError(parts.join(' | '))
     } finally {
       setBusy(false)
     }
