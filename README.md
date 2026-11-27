@@ -85,7 +85,7 @@ In Studio → Settings, each member can connect their own permitted FreeLLMAPI g
 
 ## 5. Local frontend development
 
-Requirements: Node.js 20+.
+Requirements: Node.js 22+.
 
 ```bash
 npm install
