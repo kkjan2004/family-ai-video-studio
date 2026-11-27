@@ -22,14 +22,26 @@ export default function AuthGate({ children }: Props) {
       setChecking(false)
       return
     }
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session)
+    let active = true
+    const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      if (!active) return
+      setSession(nextSession)
       setChecking(false)
     })
-    const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      setSession(nextSession)
+    void supabase.auth.getSession().then(({ data: sessionData, error: sessionError }) => {
+      if (!active) return
+      if (sessionError) throw sessionError
+      setSession(sessionData.session)
+      setChecking(false)
+    }).catch(err => {
+      if (!active) return
+      setError(err instanceof Error ? err.message : 'Could not check your sign-in session.')
+      setChecking(false)
     })
-    return () => data.subscription.unsubscribe()
+    return () => {
+      active = false
+      data.subscription.unsubscribe()
+    }
   }, [])
 
   async function submit(event: FormEvent<HTMLFormElement>) {
