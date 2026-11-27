@@ -350,7 +350,7 @@ async function processJob(job) {
     await event(job.id, 'started', `Preparing ${clipCount} short clips.`, 2)
     for (let index = 0; index < clipCount; index++) {
       const seconds = Math.min(clipSeconds, job.target_duration_seconds - index * clipSeconds)
-      const scene = storyboard[Math.min(Math.floor(index / 5), storyboard.length - 1)]
+      const scene = storyboard[Math.min(Math.floor((index / clipCount) * storyboard.length), storyboard.length - 1)]
       const scenePrompt = [
         job.prompt,
         `Scene: ${scene.title}. ${scene.visual_prompt}`,
@@ -382,7 +382,8 @@ async function processJob(job) {
     await writeFile(concatPath, normalized.map(path => `file '${path.replace(/'/g, "'\\''")}'`).join('\n'))
     const silentPath = join(workDir, 'silent.mp4')
     const outputPath = join(workDir, 'final.mp4')
-    const targetBitrate = Math.max(160000, Math.floor((47 * 1024 * 1024 * 8 * 0.9) / job.target_duration_seconds))
+    const audioBitrate = job.narration_enabled || backgroundMusicPath ? 128000 : 0
+    const targetBitrate = Math.max(160000, Math.floor((46 * 1024 * 1024 * 8 * 0.9) / job.target_duration_seconds - audioBitrate))
     await run('ffmpeg', ['-y','-f','concat','-safe','0','-i',concatPath,'-c:v','libx264','-preset','veryfast','-b:v',String(targetBitrate),'-maxrate',String(targetBitrate),'-bufsize',String(targetBitrate * 2),'-pix_fmt','yuv420p','-an','-movflags','+faststart',silentPath])
     let finalPath = silentPath
     if (narrationSegments.length) {
