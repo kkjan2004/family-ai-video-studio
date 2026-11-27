@@ -5,7 +5,7 @@ import {
   ChevronRight, Play, Users, Copy, LogOut, RefreshCw,
   LoaderCircle, CheckCircle2, AlertCircle, UploadCloud, UserPlus
 } from 'lucide-react'
-import { supabase } from './lib/supabase'
+import { supabase, supabaseUrl } from './lib/supabase'
 
 type Section = 'Home' | 'Create video' | 'My projects' | 'Family space' | 'Settings'
 type Family = { id: string; name: string; created_at: string }
@@ -72,12 +72,18 @@ function App() {
     if (!supabase) return
     setLoading(true)
     setError('')
+    let diagnosticStep = 'Starting workspace load'
+    let diagnosticPath = '/auth/v1/user'
     try {
+      diagnosticStep = 'Checking signed-in user'
+      diagnosticPath = '/auth/v1/user'
       const { data: authData, error: authError } = await supabase.auth.getUser()
       if (authError) throw authError
       if (!authData.user) return
       setUserId(authData.user.id)
       setUserEmail(authData.user.email ?? '')
+      diagnosticStep = 'Loading your family membership'
+      diagnosticPath = '/rest/v1/family_members?select=family_id%2Crole%2Cjoined_at%2Cfamilies%28id%2Cname%2Ccreated_at%29'
       const { data: membershipRows, error: membershipError } = await supabase
         .from('family_members')
         .select('family_id, role, joined_at, families(id,name,created_at)')
@@ -91,6 +97,8 @@ function App() {
         return
       }
       setFamily(selectedFamily)
+      diagnosticStep = 'Loading family members and projects'
+      diagnosticPath = '/rest/v1/family_members and /rest/v1/projects'
       const [memberResult, projectResult] = await Promise.all([
         supabase.from('family_members').select('user_id,role,joined_at').eq('family_id', selectedFamily.id).order('joined_at'),
         supabase.from('projects').select('id,family_id,title,description,status,visibility,created_at').eq('family_id', selectedFamily.id).order('created_at', { ascending: false })
@@ -101,6 +109,8 @@ function App() {
       const loadedProjects = (projectResult.data ?? []) as Project[]
       setProjects(loadedProjects)
       if (loadedProjects.length) {
+        diagnosticStep = 'Loading video jobs'
+        diagnosticPath = '/rest/v1/video_jobs'
         const { data: jobRows, error: jobsError } = await supabase.from('video_jobs')
           .select('id,project_id,mode,status,progress,prompt,quality_target,target_duration_seconds,created_at,error_message,output_asset_id')
           .in('project_id', loadedProjects.map(project => project.id))
@@ -109,7 +119,9 @@ function App() {
         setJobs((jobRows ?? []) as VideoJob[])
       } else setJobs([])
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not load your family workspace.')
+      const message = err instanceof Error ? err.message : String(err)
+      console.error('Workspace request diagnostic:', { step: diagnosticStep, path: diagnosticPath, projectUrl: supabaseUrl, error: err })
+      setError(`${message} | WHERE: ${diagnosticStep} | REQUEST: ${supabaseUrl ?? 'Supabase URL missing'}${diagnosticPath}`)
     } finally {
       setLoading(false)
     }
